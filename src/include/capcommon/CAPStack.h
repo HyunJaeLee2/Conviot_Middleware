@@ -10,6 +10,7 @@
 
 #include <cap_common.h>
 #include <CAPString.h>
+#include <CAPLinkedList.h>
 
 #ifdef __cplusplus
 extern "C"
@@ -17,6 +18,7 @@ extern "C"
 #endif
 
 typedef cap_result (*CbFnCAPStack)(IN void *pData, IN void *pUserData);
+typedef CbFnCAPLinkedListDup CbFnCAPStackDup;
 
 /**
  * @brief Create a stack handle.
@@ -85,8 +87,27 @@ cap_result CAPStack_Pop(cap_handle hStack, OUT void **ppData);
  *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE, @ref ERR_CAP_INVALID_PARAM, \n
  *         @ref ERR_CAP_NO_DATA.
  */
-
 cap_result CAPStack_Top(cap_handle hStack, OUT void **ppData);
+
+/**
+ * @brief Duplicate a stack.
+ *
+ * This function copies all the data from @a hSrcStack to @a hDstStack. \n
+ * To copy each internal data in the stack item, @a fnCallback callback function is used. \n
+ * The destination stack must not have any item, and the source stack must have \n
+ * at least one item. Otherwise, it retrieves an error.
+ *
+ * @param hDstStack a destination stack handle.
+ * @param hSrcStack a source stack handle.
+ * @param fnCallback callback function for copying internal data of each stack item.
+ * @param pUserData user data pointer passing to the callback function.
+ *
+ * @return @ref ERR_CAP_NOERROR is returned if there is no error. \n
+ *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE, @ref ERR_CAP_NOT_EMTPY,
+ *         @ref ERR_CAP_NO_DATA.
+ */
+cap_result CAPStack_Duplicate(cap_handle hDstStack, cap_handle hSrcStack,
+                                IN CbFnCAPStackDup fnCallback, IN void *pUserData);
 
 /**
  * @brief Get the number of elements in the stack.

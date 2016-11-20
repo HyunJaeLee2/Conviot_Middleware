@@ -13,6 +13,30 @@
 
 #include <CAPTime.h>
 
+cap_result CAPTime_GetCurTimeInMilliSeconds(long long *pllTime)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    long long llTime = 0;
+    struct timeval stTime;
+    int nRet = 0;
+
+    IFVARERRASSIGNGOTO(pllTime, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    nRet = gettimeofday(&stTime, NULL); 
+    if(nRet != 0)
+    {
+        ERRASSIGNGOTO(result, ERR_CAP_INTERNAL_FAIL, _EXIT)
+    }
+
+    llTime = (((long long) stTime.tv_sec) * 1000) + (stTime.tv_usec / 1000);
+
+    *pllTime = llTime;
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
 cap_result CAPTime_GetCurTickInMilliSeconds(long long *pllTime)
 {
     cap_result result = ERR_CAP_UNKNOWN;

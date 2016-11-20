@@ -490,8 +490,15 @@ cap_result CAPString_SetLength(cap_string strTarget, int nLength)
 
     if(nLength <= pstStr->nStringLen)
     {
-        pstStr->pszStr[nLength] = '\0';
-        pstStr->nStringLen = nLength;
+        if(pstStr->pszStr == NULL)
+        {
+            // length 0 with CAPString is created but not set before.
+        }
+        else
+        {
+            pstStr->pszStr[nLength] = '\0';
+            pstStr->nStringLen = nLength;
+        }
     }
     else // nLength > pstStr->nStringLen
     {

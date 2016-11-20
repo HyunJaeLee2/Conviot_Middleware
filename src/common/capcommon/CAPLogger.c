@@ -176,6 +176,7 @@ cap_result CAPLogger_Destroy(IN OUT cap_handle *phLog)
 
     if(pstLogger->hThreadLock != NULL)
     {
+        CAPFile_Flush(pstLogger->hFile);
         result = CAPThreadLock_Lock(pstLogger->hThreadLock);
         if(result == ERR_CAP_NOERROR)
         {
@@ -199,7 +200,7 @@ _EXIT:
     return result;
 }
 
-cap_result CAPLogger_Write(IN cap_handle hLog, ELogMsgLevel enMsgLogLevel, char *pszFormat, ...)
+cap_result CAPLogger_Write(IN cap_handle hLog, ELogMsgLevel enMsgLogLevel, const char *pszFormat, ...)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SCAPLogger *pstLogger = NULL;

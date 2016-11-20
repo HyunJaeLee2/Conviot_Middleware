@@ -16,7 +16,7 @@ typedef struct _SCentralManager {
     cap_handle hValueTopicQueue;
 } SCentralManager;
 
-cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN char *pszBrokerURI, IN char *pszDBFileName, IN int nSocketListeningPort);
+cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN char *pszBrokerURI);
 cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN char *pszBrokerURI);
 cap_result CentralManager_Destroy(IN OUT cap_handle* phCentralManager);
 

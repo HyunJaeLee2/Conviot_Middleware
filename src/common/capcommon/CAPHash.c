@@ -236,6 +236,10 @@ cap_result CAPHash_AddKey(cap_handle hHash, IN cap_string strKey, IN void *pData
     stUserData.nOffsetToReturn = OFFSET_NOT_SET;
 
     result = CAPLinkedList_Traverse(pstHash->paLinkedList[unBucketIndex], findKey, (void *) &stUserData);
+    if(result == ERR_CAP_FOUND_DATA)
+    {
+        result = ERR_CAP_DUPLICATED;
+    }
     ERRIFGOTO(result, _EXIT);
 
     pstHashNode = (SHashNode *) malloc(sizeof(SHashNode));
@@ -253,10 +257,6 @@ cap_result CAPHash_AddKey(cap_handle hHash, IN cap_string strKey, IN void *pData
     pstHashNode->pData = pData;
 
     result = CAPLinkedList_Add(pstHash->paLinkedList[unBucketIndex], LINKED_LIST_OFFSET_LAST, 0, pstHashNode);
-    if(result == ERR_CAP_FOUND_DATA)
-    {
-        result = ERR_CAP_DUPLICATED;
-    }
     ERRIFGOTO(result, _EXIT);
 
     // Because the hash node is already inserted into the LinkedList, set pointer to NULL
@@ -339,6 +339,52 @@ static cap_result hashLinkedListTraverse(IN int nOffset, IN void *pData, IN void
            ERRIFGOTO(result, _EXIT);
         }
     }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
+
+static int getItemNum(SCAPHash *pstHash)
+{
+    int nItemNum = 0;
+    int nLoop = 0;
+    int nLength = 0;
+    cap_result result = ERR_CAP_UNKNOWN;
+
+    for(nLoop = 0 ; nLoop < pstHash->nBucketSize ; nLoop++)
+    {
+        result = CAPLinkedList_GetLength(pstHash->paLinkedList[nLoop], &nLength);
+        ERRIFGOTO(result, _EXIT);
+
+        nItemNum += nLength;
+    }
+_EXIT:
+    if(result != ERR_CAP_NOERROR)
+    {
+        nItemNum = -1;
+    }
+    return nItemNum;
+}
+
+
+
+cap_result CAPHash_GetNumberOfItems(cap_handle hHash, OUT int *pnItemNum)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SCAPHash *pstHash = NULL;
+
+    if(IS_VALID_HANDLE(hHash, HANDLEID_CAP_HASH) == FALSE)
+    {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_HANDLE, _EXIT);
+    }
+
+    IFVARERRASSIGNGOTO(pnItemNum, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstHash = (SCAPHash *) hHash;
+
+    *pnItemNum = getItemNum(pstHash);
 
     result = ERR_CAP_NOERROR;
 _EXIT:
@@ -459,27 +505,6 @@ _EXIT:
     return result;
 }
 
-static int getItemNum(SCAPHash *pstHash)
-{
-    int nItemNum = 0;
-    int nLoop = 0;
-    int nLength = 0;
-    cap_result result = ERR_CAP_UNKNOWN;
-
-    for(nLoop = 0 ; nLoop < pstHash->nBucketSize ; nLoop++)
-    {
-        result = CAPLinkedList_GetLength(pstHash->paLinkedList[nLoop], &nLength);
-        ERRIFGOTO(result, _EXIT);
-
-        nItemNum += nLength;
-    }
-_EXIT:
-    if(result != ERR_CAP_NOERROR)
-    {
-        nItemNum = -1;
-    }
-    return nItemNum;
-}
 
 static cap_result hashDataTraverse(IN cap_string strKey, IN void *pData, IN void *pUserData)
 {

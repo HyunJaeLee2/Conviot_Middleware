@@ -68,17 +68,18 @@ cap_result CAPThreadEvent_WaitEvent(cap_handle hEvent);
  *  
  * This function waits an event. \n
  * A thread is blocked inside this function until \n
- * either an event is set or @a nSleepTime time is exceeded.
+ * either an event is set or @a llSleepTimeMs milliseconds time is exceeded. \n
+ * If the time is exceeded, this function returns @ref ERR_CAP_TIME_EXPIRED.
  * 
  * @param hEvent an event handle.
  * @param nSleepTime maximum time to be blocked.
  *
  * @return @ref ERR_CAP_NOERROR is returned if there is no error. \n
- *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE, @ref ERR_CAP_MUTEX_ERROR.
+ *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE, @ref ERR_CAP_MUTEX_ERROR, \n
+ *         @ref ERR_CAP_TIME_EXPIRED.
  *
- * @todo Currently, this function consider the timeout case as a no error. Need to be fixed.
  */
-cap_result CAPThreadEvent_WaitTimeEvent(cap_handle hEvent, int nSleepTime);
+cap_result CAPThreadEvent_WaitTimeEvent(cap_handle hEvent, long long llSleepTimeMs);
 
 /** 
  * @brief Destroy an event handle.

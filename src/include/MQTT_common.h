@@ -21,8 +21,7 @@ typedef struct _SMQTTData{
 
 cap_result assignLastElementFromTopicList(cap_handle hTopicLinkedList, OUT char **ppDeviceId, OUT int *pnDeviceIdBufSize);
 cap_result assignIdentifierFromTopicList(cap_handle hTopicLinkedList, OUT char **ppIdentifier, OUT int *pnIdentifierBufSize);
+cap_result getLastElementFromTopicList(cap_handle hTopicLinkedList, cap_string *pstrLastElement);
 cap_result divideTopicNameToList(IN cap_string strTopic, IN OUT cap_handle hLinkedList);
-CALLBACK cap_result topicNameDataDestroy(int nOffset, void *pData, void *pUsrData);
-CALLBACK cap_result MQTTData_Destroy(void* pData, void* pUsrData);
 
 #endif

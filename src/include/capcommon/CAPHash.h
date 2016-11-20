@@ -122,6 +122,20 @@ cap_result CAPHash_GetDataByKey(cap_handle hHash, IN cap_string strKey, OUT void
 cap_result CAPHash_RemoveAll(cap_handle hHash, IN CbFnCAPHash fnDestroyCallback, IN void *pUserData);
 
 
+/**
+ * @brief Retrieve the number of items in the hash.
+ *
+ * This function retrieves the number of items in the hash.
+ *
+ * @param hHash a hash handle.
+ * @pnItemNum [out] the number of items in the hash.
+ *
+ * @return @ref ERR_CAP_NOERROR is returned if there is no error. \n
+ *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE, @ref ERR_CAP_INVALID_PARAM.
+ */
+cap_result CAPHash_GetNumberOfItems(cap_handle hHash, OUT int *pnItemNum);
+
+
 /** 
  * @brief Traverse all hash data in hash data structure.
  *  

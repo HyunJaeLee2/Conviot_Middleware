@@ -6,6 +6,7 @@
 
 *.swp
 *.in
+*.log
 
 # Precompiled Headers
 *.gch

@@ -174,10 +174,14 @@ typedef enum _ECapResult {
 	ERR_CAP_INVALID_ARGUMENT   = 50,
 	ERR_CAP_INVALID_REQUEST    = 51,
 	ERR_CAP_READ_DATA_LACK     = 52,
+	ERR_CAP_NOT_CONNECTED      = 53,
+	ERR_CAP_REACH_TO_MAXIMUM   = 54,
+	ERR_CAP_NOT_INITIALIZED    = 55,
+	ERR_CAP_END_OF_DATA        = 56,
 } cap_result;
 
 
-//#define _DEBUG
+#define _DEBUG
 
 #ifdef _DEBUG
 

@@ -187,8 +187,6 @@ cap_result CAPLinkedList_Attach(IN OUT cap_handle phLinkedList_front, IN cap_han
 /** 
  * @brief Duplicate a linked list.
  *  
- * This function duplicates
- *
  * This function copies all the data from @a hLinkedListSrc to @a hLinkedListDst. \n
  * To copy each internal linked list node, @a fnCallback callback function is used. \n
  * The destination linked list must not have any node and the source linked list must have \n

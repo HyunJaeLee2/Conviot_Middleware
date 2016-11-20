@@ -17,6 +17,18 @@ extern "C"
 {
 #endif
 
+/**
+ * @brief Get current linux time in milliseconds.
+ *  
+ * This function retrieves a current linux time in millisecond time unit.
+ * This function can be used for time measurement.
+ *
+ * @param pllTime [out] current linux in milliseconds.
+ *
+ * @return @ref ERR_CAP_NOERROR is returned if there is no error. \n
+ *         Errors to be returned - @ref ERR_CAP_INVALID_PARAM, @ref ERR_CAP_INTERNAL_FAIL.
+ */
+cap_result CAPTime_GetCurTimeInMilliSeconds(long long *pllTime);
 
 /**
  * @brief Get current tick value in milliseconds.

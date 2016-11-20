@@ -87,23 +87,13 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	pszLogPath = (char *)malloc(PATH_MAX);
 	ERRMEMGOTO(pszLogPath, result, _EXIT);
 
-	//make the full path of log file
-	if((pszLogFilePath[0] != '/') && (pszLogFilePath[0] != '.') && (pszLogFilePath[0] != '~')){
-		memcpy(pszLogPath, pszConfigDirPath, strlen(pszConfigDirPath)+1);
-		strncat(pszLogPath, "/", 1);
-		strncat(pszLogPath,pszLogFilePath, strlen(pszLogFilePath)+1);
-	}
-	else{
-		realpath(pszLogFilePath, pszLogPath);
-	}
-
 	pstConfigData->pszBrokerURI = strdup(pszBrokerURI);
 	pstConfigData->nLogLevel = nLogLevel;
 
 	pstConfigData->strLogFilePath = CAPString_New();
 	ERRMEMGOTO(pstConfigData->strLogFilePath, result, _EXIT);
 
-	result = CAPString_SetLow(pstConfigData->strLogFilePath, pszLogPath,strlen(pszLogPath)+1);
+	result = CAPString_SetLow(pstConfigData->strLogFilePath, pszLogFilePath,strlen(pszLogFilePath)+1);
 	ERRIFGOTO(result, _EXIT);
 
 	pstConfigData->nLogMaxSize = nLogMaxSize*MB;
@@ -124,7 +114,6 @@ int main(int argc, char* argv[])
     cap_handle hCentralManager = NULL;
     SConfigData *pstConfigData = NULL;
     cap_result result = ERR_CAP_UNKNOWN;
-	char* config_file = NULL;
 	cap_string strLogPrefix = NULL;
 
     if(argc != 2){
@@ -155,7 +144,7 @@ int main(int argc, char* argv[])
 	result = CAPLogger_Write(g_hLogger, MSG_INFO, "conviot_middleware start");
 	ERRIFGOTO(result, _EXIT);
     
-	result = CentralManager_Create(&hCentralManager, pstConfigData->pszBrokerURI, NULL, 0);
+	result = CentralManager_Create(&hCentralManager, pstConfigData->pszBrokerURI);
     ERRIFGOTO(result, _EXIT);
 
     result = CentralManager_Execute(hCentralManager, pstConfigData->pszBrokerURI);

@@ -124,6 +124,51 @@ _EXIT:
 	return result;
 }
 
+
+cap_result CAPQueue_RemoveAll(cap_handle hQueue, CbFnQueueTraverse fnCallbackDestroy, void *pUsrData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SCAPQueue *pstQueue = NULL;
+    SQueueCallback stCallback;
+    int nLoop = 0;
+    int nLinkedListSize = 0;
+
+    IFVARERRASSIGNGOTO(fnCallbackDestroy, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    if (IS_VALID_HANDLE(hQueue, HANDLEID_CAP_THREAD_QUEUE) == FALSE) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_HANDLE, _EXIT);
+    }
+
+    pstQueue = (SCAPQueue *) hQueue;
+
+    result = CAPThreadLock_Lock(pstQueue->hLock);
+    ERRIFGOTO(result, _EXIT);
+
+    stCallback.fnCallback = fnCallbackDestroy;
+    stCallback.pUserData = pUsrData;
+    result = CAPLinkedList_Traverse(pstQueue->hDataLinkedList, CAPQueueCB_DataDestroy, &stCallback);
+    ERRIFGOTO(result, _EXIT_LOCK);
+
+    result = CAPLinkedList_GetLength(pstQueue->hDataLinkedList,  &nLinkedListSize);
+    ERRIFGOTO(result, _EXIT_LOCK);
+
+    for(nLoop = 0 ; nLoop < nLinkedListSize ; nLoop++)
+        //for(pstNode = pstLinkedList->pFirst; pstNode != NULL ; pstNode = pstNode->pNext)
+    {
+        result = CAPLinkedList_Remove(pstQueue->hDataLinkedList, LINKED_LIST_OFFSET_FIRST, 0);
+        ERRIFGOTO(result, _EXIT_LOCK);
+    }
+
+    pstQueue->bDestroy = FALSE;
+
+    result = ERR_CAP_NOERROR;
+_EXIT_LOCK:
+    CAPThreadLock_Unlock(pstQueue->hLock);
+_EXIT:
+    return result;
+}
+
+
 cap_result CAPQueue_Destroy(IN OUT cap_handle *phQueue, CbFnQueueTraverse fnCallbackDestroy, void *pUsrData)
 {
 	cap_result result = ERR_CAP_UNKNOWN;

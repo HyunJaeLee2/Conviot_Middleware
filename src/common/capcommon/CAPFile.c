@@ -324,17 +324,19 @@ cap_result CAPFile_GetFileSize(IN cap_handle hFile, OUT int *pnSize)
 		ERRASSIGNGOTO(result, ERR_CAP_INVALID_HANDLE, _EXIT);
 	}
 
+	IFVARERRASSIGNGOTO(pnSize, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
 	pstFile = (SCAPFile *) hFile;
     IFVARERRASSIGNGOTO(pstFile->pFile, NULL, result, ERR_CAP_FILE_NOT_OPENED, _EXIT);
 
-	nFileSeekCurBuf = FILE_SEEK_CUR;
+    nFileSeekCurBuf = ftell(pstFile->pFile);
 	
 	result = CAPFile_Seek(pstFile, 0L, FILE_SEEK_END);
 	ERRIFGOTO(result, _EXIT);
 	
 	*pnSize = ftell(pstFile->pFile);		
 
-	CAPFile_Seek(pstFile, 0L, nFileSeekCurBuf);
+	result = CAPFile_Seek(pstFile, nFileSeekCurBuf, FILE_SEEK_START);
 	ERRIFGOTO(result, _EXIT);
 
 	result = ERR_CAP_NOERROR;

@@ -96,6 +96,23 @@ cap_result CAPQueue_GetLength(cap_handle hQueue, OUT int *pnLength);
 //cap_result CAPQueue_Traverse(cap_handle hQueue, IN CbFnQueueTraverse fnTraverse, IN void *pUserData);
 
 
+
+/**
+ * @brief Remove all items in the queue.
+ *
+ * This function removes all items in the queue.
+ * In addition, it also clears exit flag set by CAPQueue_SetExit.
+ *
+ * @param hQueue a queue handle.
+ * @param fnCallbackDestroy callback function for destroying internal queue data.
+ * @param pUsrData user data pointer passing to the callback function.
+ *
+ * @return @ref ERR_CAP_NOERROR is returned if there is no error. \n
+ *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE.
+ */
+cap_result CAPQueue_RemoveAll(cap_handle hQueue, CbFnQueueTraverse fnCallbackDestroy, void *pUsrData);
+
+
 /** 
  * @brief Destroy a queue handle.
  *  

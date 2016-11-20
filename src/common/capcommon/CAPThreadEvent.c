@@ -102,7 +102,7 @@ _EXIT:
 	return result;
 }
 
-cap_result CAPThreadEvent_WaitTimeEvent(cap_handle hEvent, int nSleepTime){
+cap_result CAPThreadEvent_WaitTimeEvent(cap_handle hEvent, long long llSleepTimeMs){
 	cap_result result = ERR_CAP_UNKNOWN;
 	SThreadEvent *pstEvent = NULL;
 	struct timespec sTimeOut;
@@ -122,8 +122,8 @@ cap_result CAPThreadEvent_WaitTimeEvent(cap_handle hEvent, int nSleepTime){
 	//gettimeofday(&sNow, NULL);
 	clock_gettime(CLOCK_REALTIME, &sNow);
 
-	sTimeOut.tv_sec = sNow.tv_sec + nSleepTime;
-	sTimeOut.tv_nsec = sNow.tv_nsec;
+	sTimeOut.tv_sec = sNow.tv_sec + llSleepTimeMs/1000;
+	sTimeOut.tv_nsec = sNow.tv_nsec + (llSleepTimeMs % 1000)*1000000;
 
 #ifdef HAVE_PTHREAD
 	if (pthread_mutex_lock(&(pstEvent->hMutex)) != 0) {
@@ -132,17 +132,22 @@ cap_result CAPThreadEvent_WaitTimeEvent(cap_handle hEvent, int nSleepTime){
 
 	ret = pthread_cond_timedwait(&(pstEvent->hCond), &(pstEvent->hMutex), &sTimeOut);
 	
-	if(ret == 0 || ret == ETIMEDOUT)
+	if(ret == 0)
 	{
-		//do nothing
+	    // do nothing
+	}
+	else if(ret == ETIMEDOUT)
+	{
+	    CAPASSIGNGOTO(result, ERR_CAP_TIME_EXPIRED, _EXIT_LOCK);
 	}
 	else
 	{
 		ERRASSIGNGOTO(result, ERR_CAP_MUTEX_ERROR, _EXIT_LOCK);
 	}
 
-
 	pstEvent->bIsSet = FALSE;
+
+	result = ERR_CAP_NOERROR;
 _EXIT_LOCK:
 	if (pthread_mutex_unlock(&(pstEvent->hMutex)) != 0) {
 		ERRASSIGNGOTO(result, ERR_CAP_MUTEX_ERROR, _EXIT);
@@ -150,7 +155,6 @@ _EXIT_LOCK:
 #else
 	//error
 #endif
-	result = ERR_CAP_NOERROR;
 _EXIT:
 	return result;
 }

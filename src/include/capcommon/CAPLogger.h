@@ -109,7 +109,7 @@ cap_result CAPLogger_Destroy(IN OUT cap_handle *phLog);
  * @return @ref ERR_CAP_NOERROR is returned if there is no error. \n
  *         Errors to be returned - @ref ERR_CAP_INVALID_HANDLE, @ref ERR_CAP_INVALID_PARAM.
  */
-cap_result CAPLogger_Write(IN cap_handle hLog, ELogMsgLevel enLogLevel, char *pszFormat, ...);
+cap_result CAPLogger_Write(IN cap_handle hLog, ELogMsgLevel enLogLevel, const char *pszFormat, ...);
 
 #ifdef __cplusplus
 }

@@ -214,8 +214,13 @@ cap_result CAPSocket_Bind(cap_handle hServerSocket)
 
         stLinger.l_onoff = TRUE;
         stLinger.l_linger = 0;
+
+        //For Test Purpose
+        int optval = 1;
+        nRet = setsockopt(pstSocket->nSocketfd, IPPROTO_TCP, TCP_NODELAY, &optval, sizeof(optval));
+
         //nRet = setsockopt(pstSocket->nSocketfd, SOL_SOCKET, TCP_NODELAY, &stLinger, sizeof(stLinger));
-        nRet = setsockopt(pstSocket->nSocketfd, SOL_SOCKET, SO_LINGER, &stLinger, sizeof(stLinger));
+        //nRet = setsockopt(pstSocket->nSocketfd, SOL_SOCKET, SO_LINGER, &stLinger, sizeof(stLinger));
         if(nRet != 0)
         {
             ERRASSIGNGOTO(result, ERR_CAP_SOCKET_ERROR, _EXIT);

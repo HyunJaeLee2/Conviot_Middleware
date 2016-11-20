@@ -34,7 +34,7 @@ cap_result removeStackData(IN int nOffset, IN void *pData, IN void *pUserData)
     pstUserData->fnDestroyCallback(pData, pstUserData->pUserData);
 
     result = ERR_CAP_NOERROR;
-_EXIT:
+
     return result;
 }
 
@@ -154,6 +154,30 @@ cap_result CAPStack_Pop(cap_handle hStack, OUT void **ppData)
 
     *ppData = pData;
     
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
+cap_result CAPStack_Duplicate(cap_handle hStack, IN cap_handle hSrcStack, IN CbFnCAPStackDup fnCallback, IN void *pUserData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+
+    if (IS_VALID_HANDLE(hStack, HANDLEID_CAP_STACK) == FALSE) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_HANDLE, _EXIT);
+    }
+
+    if (IS_VALID_HANDLE(hSrcStack, HANDLEID_CAP_STACK) == FALSE) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_HANDLE, _EXIT);
+    }
+
+    IFVARERRASSIGNGOTO(fnCallback, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    // CAPLinkedList_Duplicate will retrieve appropriate error codes
+    // such as ERR_CAP_NOT_EMPTY ,or ERR_CAP_NO_DATA.
+    result = CAPLinkedList_Duplicate(hStack, hSrcStack, fnCallback, pUserData);
+    ERRIFGOTO(result, _EXIT);
+
     result = ERR_CAP_NOERROR;
 _EXIT:
     return result;
