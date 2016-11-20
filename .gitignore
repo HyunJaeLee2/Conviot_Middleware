@@ -4,6 +4,9 @@
 *.obj
 *.elf
 
+*.swp
+*.in
+
 # Precompiled Headers
 *.gch
 *.pch
@@ -13,6 +16,7 @@
 *.a
 *.la
 *.lo
+*.Po
 
 # Shared objects (inc. Windows DLLs)
 *.dll
