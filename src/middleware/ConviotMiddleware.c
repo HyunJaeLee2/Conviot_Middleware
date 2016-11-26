@@ -23,14 +23,6 @@
 #include "CAPLogger.h"
 #include "cap_common.h"
 
-typedef struct _SConfigData{
-    char *pszBrokerURI;
-	int nLogLevel;
-	cap_string strLogFilePath;
-	int nLogMaxSize;
-	int nLogBackupNum;
-} SConfigData;
-
 cap_handle g_hLogger = NULL;
 
 static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
@@ -77,6 +69,9 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	if (!config_lookup_int(cf, LOG_BACKUP_NUM, &nLogBackupNum)){
 		fprintf(stderr, "log_backup_num error\n");
 	}
+
+    //TODO
+    //Get socket listening and connecting port then hand it to Infomanager
 
 	pszConfigDirPath = (char *)malloc(PATH_MAX);
 	ERRMEMGOTO(pszConfigDirPath, result, _EXIT);
@@ -144,10 +139,10 @@ int main(int argc, char* argv[])
 	result = CAPLogger_Write(g_hLogger, MSG_INFO, "conviot_middleware start");
 	ERRIFGOTO(result, _EXIT);
     
-	result = CentralManager_Create(&hCentralManager, pstConfigData->pszBrokerURI);
+	result = CentralManager_Create(&hCentralManager, pstConfigData);
     ERRIFGOTO(result, _EXIT);
 
-    result = CentralManager_Execute(hCentralManager, pstConfigData->pszBrokerURI);
+    result = CentralManager_Execute(hCentralManager, pstConfigData);
     ERRIFGOTO(result, _EXIT);
 
 	result = CentralManager_Destroy(&hCentralManager);

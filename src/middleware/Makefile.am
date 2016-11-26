@@ -2,6 +2,7 @@ bin_PROGRAMS=conviot_middleware
 conviot_middleware_SOURCES=CentralManager.c \
 						   ThingManager.c \
 						   MQTTMessageHandler.c \
+						   InfoManager.c \
                            ConviotMiddleware.c 
 
 conviot_middleware_CFLAGS= $(PTHREAD_CFLAGS) $(JSONC_CFLAGS) -I../include -I../include/capcommon

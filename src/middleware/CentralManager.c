@@ -13,11 +13,10 @@
 
 #include "CentralManager.h"
 #include "ThingManager.h"
+#include "InfoManager.h"
 
 /*
 #include "JobManager.h"
-#include "InfoManager.h"
-#include "ClientManager.h"
 #include "DBHandler.h"
 */
 
@@ -29,9 +28,12 @@ void intHandler(int dummy) {
     g_bExit = TRUE;
 }
 
-cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN char *pszBrokerURI){
+cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigData *pstConfigData)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     SCentralManager *pstCentralManager = NULL;
+    cap_string strBrokerURI = NULL;
+
     IFVARERRASSIGNGOTO(phCentralManager, NULL, result, ERR_CAP_INVALID_PARAM,
             _EXIT);
 
@@ -42,34 +44,38 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN char *pszB
     ERRMEMGOTO(pstCentralManager, result, _EXIT);
 
     pstCentralManager->enID = HANDLEID_CENTRAL_MANAGER;
-    pstCentralManager->hClientManager = NULL;
     pstCentralManager->hJobManager = NULL;
     pstCentralManager->hThingManager = NULL;
     pstCentralManager->hInfoManager = NULL;
     pstCentralManager->hValueTopicQueue = NULL;
 
     // create event to keep thread running
-    CAPThreadEvent_Create(&hEvent);
+    result = CAPThreadEvent_Create(&hEvent);
+    ERRIFGOTO(result, _EXIT);
+
+    strBrokerURI = CAPString_New();
+    ERRMEMGOTO(strBrokerURI, result, _EXIT);
+
+    result = CAPString_SetLow(strBrokerURI, pstConfigData->pszBrokerURI, CAPSTRING_MAX);
+    ERRIFGOTO(result, _EXIT);
+
 
     /*
     result = DBHandler_OpenDB(pszDBFileName);
     ERRIFGOTO(result, _EXIT);
     */
 
-    result = ThingManager_Create(&(pstCentralManager->hThingManager), pszBrokerURI);
+    result = ThingManager_Create(&(pstCentralManager->hThingManager), strBrokerURI);
     ERRIFGOTO(result, _EXIT);
    
     /*
-    result = ClientManager_Create(&(pstCentralManager->hClientManager), pszBrokerURI);
-    ERRIFGOTO(result, _EXIT);
-
     result = JobManager_Create(&(pstCentralManager->hJobManager), pszBrokerURI);
     ERRIFGOTO(result, _EXIT);
+    */
 
-    result = InfoManager_Create(&(pstCentralManager->hInfoManager), pszBrokerURI, nSocketListeningPort);
+    result = InfoManager_Create(&(pstCentralManager->hInfoManager), strBrokerURI, pstConfigData->nSocketListeningPort);
     ERRIFGOTO(result, _EXIT);
     
-    */
     result = CAPQueue_Create(&(pstCentralManager->hValueTopicQueue));
     ERRIFGOTO(result, _EXIT);
 
@@ -80,9 +86,8 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN char *pszB
         ThingManager_Destroy(&(pstCentralManager->hThingManager));
         /*
         JobManager_Destroy(&(pstCentralManager->hJobManager));
-        InfoManager_Destroy(&(pstCentralManager->hInfoManager));
-        ClientManager_Destroy(&(pstCentralManager->hClientManager));
         */
+        InfoManager_Destroy(&(pstCentralManager->hInfoManager));
         CAPQueue_Destroy(&(pstCentralManager->hValueTopicQueue), NULL, NULL);
         SAFEMEMFREE(pstCentralManager);
     }
@@ -90,7 +95,8 @@ _EXIT:
     return result;
 }
 
-cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN char *pszBrokerURI) {
+cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN SConfigData *pstConfigData)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     SCentralManager *pstCentralManager = NULL;
 
@@ -102,15 +108,12 @@ cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN char *pszBro
 
     result = ThingManager_Run(pstCentralManager->hThingManager, pstCentralManager->hValueTopicQueue);
     ERRIFGOTO(result, _WRAPUP_EXIT);
-
-    /*
+    
     result = InfoManager_Run(pstCentralManager->hInfoManager, pstCentralManager->hValueTopicQueue);
     ERRIFGOTO(result, _WRAPUP_EXIT);
-    
-    result = JobManager_Run(pstCentralManager->hJobManager);
-    ERRIFGOTO(result, _WRAPUP_EXIT);
 
-    result = ClientManager_Run(pstCentralManager->hClientManager);
+    /*
+    result = JobManager_Run(pstCentralManager->hJobManager);
     ERRIFGOTO(result, _WRAPUP_EXIT);
 
     result = DBHandler_InitJobHandler(pstCentralManager->hJobManager, pszBrokerURI);
@@ -127,10 +130,9 @@ _WRAPUP_EXIT:
     /*
     CAPQueue_SetExit(pstCentralManager->hValueTopicQueue);
     // ignore error to reserve the result value
-    ClientManager_Join(pstCentralManager->hClientManager);
     JobManager_Join(pstCentralManager->hJobManager);
-    InfoManager_Join(pstCentralManager->hInfoManager);
     */
+    InfoManager_Join(pstCentralManager->hInfoManager);
 _EXIT:
     return result;
 }
@@ -148,10 +150,9 @@ cap_result CentralManager_Destroy(IN OUT cap_handle *phCentralManager) {
 
     pstCentralManager = (SCentralManager *)*phCentralManager;
     ThingManager_Destroy(&(pstCentralManager->hThingManager));
+    InfoManager_Destroy(&(pstCentralManager->hInfoManager));
 /*
     JobManager_Destroy(&(pstCentralManager->hJobManager));
-    InfoManager_Destroy(&(pstCentralManager->hInfoManager));
-    ClientManager_Destroy(&(pstCentralManager->hClientManager));
 
     
 */
