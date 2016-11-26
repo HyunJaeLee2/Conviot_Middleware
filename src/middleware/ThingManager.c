@@ -241,7 +241,6 @@ cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string str
     pstThingManager->bCreated = FALSE;
     pstThingManager->hAliveHandlingThread = NULL;
     pstThingManager->pstThingAliveInfoArray = NULL;
-    pstThingManager->hValueTopicQueue = NULL;
     pstThingManager->hMessageToCloudQueue = NULL;
     pstThingManager->hEvent = NULL;
     pstThingManager->hMQTTHandler = NULL;
@@ -268,7 +267,7 @@ _EXIT:
     return result;
 }
 
-cap_result ThingManager_Run(IN cap_handle hThingManager, IN cap_handle hValueTopicQueue)
+cap_result ThingManager_Run(IN cap_handle hThingManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;

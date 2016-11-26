@@ -101,6 +101,7 @@ am_conviot_middleware_OBJECTS =  \
 	conviot_middleware-ThingManager.$(OBJEXT) \
 	conviot_middleware-MQTTMessageHandler.$(OBJEXT) \
 	conviot_middleware-InfoManager.$(OBJEXT) \
+	conviot_middleware-AppManager.$(OBJEXT) \
 	conviot_middleware-ConviotMiddleware.$(OBJEXT)
 conviot_middleware_OBJECTS = $(am_conviot_middleware_OBJECTS)
 am__DEPENDENCIES_1 =
@@ -282,6 +283,7 @@ conviot_middleware_SOURCES = CentralManager.c \
 						   ThingManager.c \
 						   MQTTMessageHandler.c \
 						   InfoManager.c \
+						   AppManager.c \
                            ConviotMiddleware.c 
 
 conviot_middleware_CFLAGS = $(PTHREAD_CFLAGS) $(JSONC_CFLAGS) -I../include -I../include/capcommon
@@ -373,6 +375,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/conviot_middleware-AppManager.Po
 include ./$(DEPDIR)/conviot_middleware-CentralManager.Po
 include ./$(DEPDIR)/conviot_middleware-ConviotMiddleware.Po
 include ./$(DEPDIR)/conviot_middleware-InfoManager.Po
@@ -448,6 +451,20 @@ conviot_middleware-InfoManager.obj: InfoManager.c
 #	$(AM_V_CC)source='InfoManager.c' object='conviot_middleware-InfoManager.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(conviot_middleware_CFLAGS) $(CFLAGS) -c -o conviot_middleware-InfoManager.obj `if test -f 'InfoManager.c'; then $(CYGPATH_W) 'InfoManager.c'; else $(CYGPATH_W) '$(srcdir)/InfoManager.c'; fi`
+
+conviot_middleware-AppManager.o: AppManager.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(conviot_middleware_CFLAGS) $(CFLAGS) -MT conviot_middleware-AppManager.o -MD -MP -MF $(DEPDIR)/conviot_middleware-AppManager.Tpo -c -o conviot_middleware-AppManager.o `test -f 'AppManager.c' || echo '$(srcdir)/'`AppManager.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/conviot_middleware-AppManager.Tpo $(DEPDIR)/conviot_middleware-AppManager.Po
+#	$(AM_V_CC)source='AppManager.c' object='conviot_middleware-AppManager.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(conviot_middleware_CFLAGS) $(CFLAGS) -c -o conviot_middleware-AppManager.o `test -f 'AppManager.c' || echo '$(srcdir)/'`AppManager.c
+
+conviot_middleware-AppManager.obj: AppManager.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(conviot_middleware_CFLAGS) $(CFLAGS) -MT conviot_middleware-AppManager.obj -MD -MP -MF $(DEPDIR)/conviot_middleware-AppManager.Tpo -c -o conviot_middleware-AppManager.obj `if test -f 'AppManager.c'; then $(CYGPATH_W) 'AppManager.c'; else $(CYGPATH_W) '$(srcdir)/AppManager.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/conviot_middleware-AppManager.Tpo $(DEPDIR)/conviot_middleware-AppManager.Po
+#	$(AM_V_CC)source='AppManager.c' object='conviot_middleware-AppManager.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(conviot_middleware_CFLAGS) $(CFLAGS) -c -o conviot_middleware-AppManager.obj `if test -f 'AppManager.c'; then $(CYGPATH_W) 'AppManager.c'; else $(CYGPATH_W) '$(srcdir)/AppManager.c'; fi`
 
 conviot_middleware-ConviotMiddleware.o: ConviotMiddleware.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(conviot_middleware_CFLAGS) $(CFLAGS) -MT conviot_middleware-ConviotMiddleware.o -MD -MP -MF $(DEPDIR)/conviot_middleware-ConviotMiddleware.Tpo -c -o conviot_middleware-ConviotMiddleware.o `test -f 'ConviotMiddleware.c' || echo '$(srcdir)/'`ConviotMiddleware.c

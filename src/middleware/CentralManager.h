@@ -20,10 +20,9 @@ typedef struct _SConfigData{
 
 typedef struct _SCentralManager {
     EIoTHandleId enID;
-    cap_handle hJobManager;
+    cap_handle hAppManager;
     cap_handle hThingManager;
     cap_handle hInfoManager;
-    cap_handle hValueTopicQueue;
 } SCentralManager;
 
 cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigData *pstConfigData);

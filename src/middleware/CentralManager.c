@@ -14,9 +14,9 @@
 #include "CentralManager.h"
 #include "ThingManager.h"
 #include "InfoManager.h"
+#include "AppManager.h"
 
 /*
-#include "JobManager.h"
 #include "DBHandler.h"
 */
 
@@ -44,10 +44,9 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigDat
     ERRMEMGOTO(pstCentralManager, result, _EXIT);
 
     pstCentralManager->enID = HANDLEID_CENTRAL_MANAGER;
-    pstCentralManager->hJobManager = NULL;
+    pstCentralManager->hAppManager = NULL;
     pstCentralManager->hThingManager = NULL;
     pstCentralManager->hInfoManager = NULL;
-    pstCentralManager->hValueTopicQueue = NULL;
 
     // create event to keep thread running
     result = CAPThreadEvent_Create(&hEvent);
@@ -59,7 +58,6 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigDat
     result = CAPString_SetLow(strBrokerURI, pstConfigData->pszBrokerURI, CAPSTRING_MAX);
     ERRIFGOTO(result, _EXIT);
 
-
     /*
     result = DBHandler_OpenDB(pszDBFileName);
     ERRIFGOTO(result, _EXIT);
@@ -68,27 +66,19 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigDat
     result = ThingManager_Create(&(pstCentralManager->hThingManager), strBrokerURI);
     ERRIFGOTO(result, _EXIT);
    
-    /*
-    result = JobManager_Create(&(pstCentralManager->hJobManager), pszBrokerURI);
+    result = AppManager_Create(&(pstCentralManager->hAppManager), strBrokerURI);
     ERRIFGOTO(result, _EXIT);
-    */
 
     result = InfoManager_Create(&(pstCentralManager->hInfoManager), strBrokerURI, pstConfigData->nSocketListeningPort);
     ERRIFGOTO(result, _EXIT);
     
-    result = CAPQueue_Create(&(pstCentralManager->hValueTopicQueue));
-    ERRIFGOTO(result, _EXIT);
-
     *phCentralManager = pstCentralManager;
 
     result = ERR_CAP_NOERROR;
     if (result != ERR_CAP_NOERROR && pstCentralManager != NULL) {
         ThingManager_Destroy(&(pstCentralManager->hThingManager));
-        /*
-        JobManager_Destroy(&(pstCentralManager->hJobManager));
-        */
+        AppManager_Destroy(&(pstCentralManager->hAppManager));
         InfoManager_Destroy(&(pstCentralManager->hInfoManager));
-        CAPQueue_Destroy(&(pstCentralManager->hValueTopicQueue), NULL, NULL);
         SAFEMEMFREE(pstCentralManager);
     }
 _EXIT:
@@ -106,19 +96,14 @@ cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN SConfigData 
 
     pstCentralManager = (SCentralManager *)hCentralManager;
 
-    result = ThingManager_Run(pstCentralManager->hThingManager, pstCentralManager->hValueTopicQueue);
+    result = ThingManager_Run(pstCentralManager->hThingManager);
     ERRIFGOTO(result, _WRAPUP_EXIT);
     
-    result = InfoManager_Run(pstCentralManager->hInfoManager, pstCentralManager->hValueTopicQueue);
+    result = InfoManager_Run(pstCentralManager->hInfoManager);
     ERRIFGOTO(result, _WRAPUP_EXIT);
 
-    /*
-    result = JobManager_Run(pstCentralManager->hJobManager);
+    result = AppManager_Run(pstCentralManager->hAppManager);
     ERRIFGOTO(result, _WRAPUP_EXIT);
-
-    result = DBHandler_InitJobHandler(pstCentralManager->hJobManager, pszBrokerURI);
-    ERRIFGOTO(result, _EXIT);
-    */
 
     // wait to be connected to broker
     CAPThreadEvent_WaitEvent(hEvent);
@@ -127,11 +112,7 @@ cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN SConfigData 
 
 _WRAPUP_EXIT:
     ThingManager_Join(pstCentralManager->hThingManager);
-    /*
-    CAPQueue_SetExit(pstCentralManager->hValueTopicQueue);
-    // ignore error to reserve the result value
-    JobManager_Join(pstCentralManager->hJobManager);
-    */
+    AppManager_Join(pstCentralManager->hAppManager);
     InfoManager_Join(pstCentralManager->hInfoManager);
 _EXIT:
     return result;
@@ -151,12 +132,7 @@ cap_result CentralManager_Destroy(IN OUT cap_handle *phCentralManager) {
     pstCentralManager = (SCentralManager *)*phCentralManager;
     ThingManager_Destroy(&(pstCentralManager->hThingManager));
     InfoManager_Destroy(&(pstCentralManager->hInfoManager));
-/*
-    JobManager_Destroy(&(pstCentralManager->hJobManager));
-
-    
-*/
-    CAPQueue_Destroy(&(pstCentralManager->hValueTopicQueue), NULL, NULL);
+    AppManager_Destroy(&(pstCentralManager->hAppManager));
     CAPThreadEvent_Destroy(&hEvent);
 
     //DBHandler_CloseDB();

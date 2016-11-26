@@ -380,35 +380,6 @@ _EXIT_ERROR:
     CAP_THREAD_END;
 }
 
-CAP_THREAD_HEAD ReceiveMessageToCloudThread(IN void* pInfoManager)
-{
-    cap_result result = ERR_CAP_UNKNOWN;
-    SInfoManager* pstInfoManager = NULL;
-    char *pszMessage = NULL;
-
-    IFVARERRASSIGNGOTO(pInfoManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-	pstInfoManager = (SInfoManager*)pInfoManager;
-
-	while (g_bExit == FALSE) {
-        result = CAPQueue_Get(pstInfoManager->hMessageToCloudQueue, TRUE, (void **) &pszMessage);
-        ERRIFGOTO(result, _EXIT);
-
-        result = makePacketThenSend(pstInfoManager, pszMessage);
-        ERRIFGOTO(result, _EXIT);
-
-        SAFEMEMFREE(pszMessage);
-    }
-
-    result = ERR_CAP_NOERROR;
-_EXIT:
-    //deallocate memory of pszMessage in case of error
-    SAFEMEMFREE(pszMessage);
-
-    CAP_THREAD_END;
-
-}
-
 cap_result InfoManager_Create(OUT cap_handle* phInfoManager, IN cap_string strBrokerURI, IN int nSocketListeningPort)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -424,9 +395,7 @@ cap_result InfoManager_Create(OUT cap_handle* phInfoManager, IN cap_string strBr
     pstInfoManager->enID = HANDLEID_INFO_MANAGER;
     pstInfoManager->bCreated = FALSE;
     pstInfoManager->nSocketListeningPort = nSocketListeningPort;
-    pstInfoManager->hReceiveMessageToCloudThread = NULL;
     pstInfoManager->hSocketAcceptingThread = NULL;
-    pstInfoManager->hMessageToCloudQueue = NULL;
     pstInfoManager->hServerSocket = NULL;
     pstInfoManager->hMessageQueueList = NULL; 
     pstInfoManager->hMQTTHandler = NULL;
@@ -474,7 +443,7 @@ _EXIT:
     return result;
 }
 
-cap_result InfoManager_Run(IN cap_handle hInfoManager, IN cap_handle hMessageToCloudQueue)
+cap_result InfoManager_Run(IN cap_handle hInfoManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SInfoManager* pstInfoManager = NULL;
@@ -489,8 +458,6 @@ cap_result InfoManager_Run(IN cap_handle hInfoManager, IN cap_handle hMessageToC
         CAPASSIGNGOTO(result, ERR_CAP_NOERROR, _EXIT);
     }
 
-    pstInfoManager->hMessageToCloudQueue = hMessageToCloudQueue; 
-
     result = MQTTMessageHandler_SetReceiveCallback(pstInfoManager->hMQTTHandler,
             mqttMessageHandlingCallback, pstInfoManager);
     ERRIFGOTO(result, _EXIT);
@@ -501,9 +468,6 @@ cap_result InfoManager_Run(IN cap_handle hInfoManager, IN cap_handle hMessageToC
     result = MQTTMessageHandler_SubscribeMany(pstInfoManager->hMQTTHandler, paszInfoManagerSubcriptionList, MQTT_SUBSCRIPTION_NUM);
     ERRIFGOTO(result, _EXIT);
     
-    result = CAPThread_Create(ReceiveMessageToCloudThread, pstInfoManager, &(pstInfoManager->hReceiveMessageToCloudThread));
-    ERRIFGOTO(result, _EXIT);
-
     //Socket bind then listen
     result = CAPSocket_Bind(pstInfoManager->hServerSocket);
     ERRIFGOTO(result, _EXIT);
@@ -547,9 +511,6 @@ cap_result InfoManager_Join(IN cap_handle hInfoManager)
        
         //unlock
         result = CAPThreadLock_Unlock(pstInfoManager->hLock);
-        ERRIFGOTO(result, _EXIT);
-        
-        result = CAPThread_Destroy(&(pstInfoManager->hReceiveMessageToCloudThread));
         ERRIFGOTO(result, _EXIT);
         
         //Destroy all the SocketThread since messagequeue has been set exited

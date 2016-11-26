@@ -7,6 +7,8 @@
 #define LOG_FILE_PATH "log_file_path"
 #define LOG_MAX_SIZE "log_max_size"
 #define LOG_BACKUP_NUM "log_backup_num"
+#define SOCKET_LISTENING_PORT "socket_listening_port"
+
 #define MB 1024*1024
 
 #include <sys/types.h>
@@ -33,6 +35,7 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	const char *pszLogFilePath = NULL;
 	int nLogMaxSize;
 	int nLogBackupNum;
+    int nSocketListeningPort;
 
 	config_t cfg, *cf;
 	char *pszLogPath = NULL;
@@ -69,6 +72,11 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	if (!config_lookup_int(cf, LOG_BACKUP_NUM, &nLogBackupNum)){
 		fprintf(stderr, "log_backup_num error\n");
 	}
+    
+    if (!config_lookup_int(cf, SOCKET_LISTENING_PORT, &nSocketListeningPort)){
+        fprintf(stderr, "socket_listening_port error\n");
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }   
 
     //TODO
     //Get socket listening and connecting port then hand it to Infomanager
@@ -83,6 +91,7 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	ERRMEMGOTO(pszLogPath, result, _EXIT);
 
 	pstConfigData->pszBrokerURI = strdup(pszBrokerURI);
+    pstConfigData->nSocketListeningPort = nSocketListeningPort; 
 	pstConfigData->nLogLevel = nLogLevel;
 
 	pstConfigData->strLogFilePath = CAPString_New();
