@@ -43,6 +43,23 @@ _EXIT:
     return result;
 }
 
+cap_result getLastElementFromTopicList(cap_handle hTopicLinkedList, cap_string *pstrLastElement) {                   
+    cap_result result = ERR_CAP_UNKNOWN;                                                                             
+    cap_string strDeviceId = NULL;                                                                                   
+    
+    IFVARERRASSIGNGOTO(hTopicLinkedList, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);                                
+    IFVARERRASSIGNGOTO(pstrLastElement, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);                                 
+    
+    result = CAPLinkedList_Get(hTopicLinkedList, LINKED_LIST_OFFSET_LAST, -1, (void **) &strDeviceId);               
+    ERRIFGOTO(result, _EXIT);                                                                                        
+    
+    *pstrLastElement = strDeviceId;                                                                                  
+    
+    result = ERR_CAP_NOERROR;                                                                                        
+_EXIT:
+    return result;                                                                                                   
+}     
+
 cap_result assignLastElementFromTopicList(cap_handle hTopicLinkedList, OUT char **ppDeviceId, OUT int *pnDeviceIdBufSize) {
     cap_result result = ERR_CAP_UNKNOWN;
     cap_string strDeviceId = NULL;

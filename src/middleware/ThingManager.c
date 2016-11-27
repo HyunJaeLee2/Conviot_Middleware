@@ -24,9 +24,7 @@
 #include "ThingManager.h"
 #include "MQTTMessageHandler.h"
 /*
-#include "ThingHandler.h"
 #include "DBHandler.h"
-#include "AppEngine.h"
 */
 #define SECOND 1000
 
@@ -39,7 +37,7 @@ static char* paszThingManagerSubcriptionList[] = {
 
 
 #define MQTT_SUBSCRIPTION_NUM (sizeof(paszThingManagerSubcriptionList) / sizeof(char*))
-#define MQTT_CLIENT_ID "cap_iot_middleware_thing"
+#define MQTT_CLIENT_ID "Conviot_ThingManager"
 
 #define TOPIC_SEPERATOR "/"
 
@@ -49,10 +47,6 @@ CAPSTRING_CONST(CAPSTR_CATEGORY_UNREGISTER, "UNREGISTER");
 CAPSTRING_CONST(CAPSTR_CATEGORY_SET_THING_ID, "SET_THING_ID");
 CAPSTRING_CONST(CAPSTR_CATEGORY_ALIVE, "ALIVE");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, TOPIC_SEPERATOR);
-
-CAPSTRING_CONST(CAPSTR_REGACK, "MT/REGACK/");
-CAPSTRING_CONST(CAPSTR_SET_THING_ID_RESULT, "ME/RESULT/SET_THING_ID/");
-CAPSTRING_CONST(CAPSTR_PINGREQ, "MT/PINGREQ/");
 
 static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hThingManager, cap_string strMessageReceiverId, cap_string strTopicCategory)
 {
