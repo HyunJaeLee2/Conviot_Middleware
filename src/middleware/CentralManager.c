@@ -69,7 +69,7 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigDat
     result = AppManager_Create(&(pstCentralManager->hAppManager), strBrokerURI);
     ERRIFGOTO(result, _EXIT);
 
-    result = InfoManager_Create(&(pstCentralManager->hInfoManager), strBrokerURI, pstConfigData->nSocketListeningPort);
+    result = InfoManager_Create(&(pstCentralManager->hInfoManager), strBrokerURI);
     ERRIFGOTO(result, _EXIT);
     
     *phCentralManager = pstCentralManager;
