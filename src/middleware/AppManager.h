@@ -13,20 +13,11 @@
 extern "C" {
 #endif
 
-typedef struct _SAppManagerCallbackData {
-    cap_string strPayload;
-    cap_string strScenarioName;
-    cap_string strScenarioText;
-    cap_string strError;
-} SAppManagerCallbackData;
-
 typedef struct _SAppManager {
     EIoTHandleId enID;
     cap_string strBrokerURI;
     cap_bool bCreated;
     cap_handle hMQTTHandler;
-    cap_handle hAppRunnerList;
-    SAppManagerCallbackData *pstCallback;
 } SAppManager;
 
 

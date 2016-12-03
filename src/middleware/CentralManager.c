@@ -96,7 +96,7 @@ cap_result CentralManager_Execute(IN cap_handle hCentralManager, IN SConfigData 
 
     pstCentralManager = (SCentralManager *)hCentralManager;
 
-    result = ThingManager_Run(pstCentralManager->hThingManager);
+    result = ThingManager_Run(pstCentralManager->hThingManager, pstConfigData->nAliveCheckingPeriod);
     ERRIFGOTO(result, _WRAPUP_EXIT);
     
     result = InfoManager_Run(pstCentralManager->hInfoManager);

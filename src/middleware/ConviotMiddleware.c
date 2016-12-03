@@ -8,6 +8,7 @@
 #define LOG_MAX_SIZE "log_max_size"
 #define LOG_BACKUP_NUM "log_backup_num"
 #define SOCKET_LISTENING_PORT "socket_listening_port"
+#define ALIVE_CHECKING_PERIOD "alive_checking_period"
 
 #define MB 1024*1024
 
@@ -36,6 +37,7 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	int nLogMaxSize;
 	int nLogBackupNum;
     int nSocketListeningPort;
+    int nAliveCheckingPeriod = 0;
 
 	config_t cfg, *cf;
 	char *pszLogPath = NULL;
@@ -77,6 +79,11 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
         fprintf(stderr, "socket_listening_port error\n");
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }   
+    
+    if (!config_lookup_int(cf, ALIVE_CHECKING_PERIOD, &nAliveCheckingPeriod)){
+		fprintf(stderr, "AliveCheckingPeriod error\n");
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+	}
 
     //TODO
     //Get socket listening and connecting port then hand it to Infomanager
@@ -90,6 +97,7 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 	pszLogPath = (char *)malloc(PATH_MAX);
 	ERRMEMGOTO(pszLogPath, result, _EXIT);
 
+    pstConfigData->nAliveCheckingPeriod = nAliveCheckingPeriod;
 	pstConfigData->pszBrokerURI = strdup(pszBrokerURI);
     pstConfigData->nSocketListeningPort = nSocketListeningPort; 
 	pstConfigData->nLogLevel = nLogLevel;

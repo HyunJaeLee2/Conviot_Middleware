@@ -32,7 +32,7 @@ static char* paszThingManagerSubcriptionList[] = {
     "TM/REGISTER/#",
     "TM/UNREGISTER/#",
     "TM/ALIVE/#",
-    "EM/SET_THING_ID/#",
+    "TM/SEND_VARIABLE/#",
 };
 
 
@@ -44,13 +44,92 @@ static char* paszThingManagerSubcriptionList[] = {
 CAPSTRING_CONST(CAPSTR_MQTT_CLIENT_ID, MQTT_CLIENT_ID);
 CAPSTRING_CONST(CAPSTR_CATEGORY_REGISTER, "REGISTER");
 CAPSTRING_CONST(CAPSTR_CATEGORY_UNREGISTER, "UNREGISTER");
-CAPSTRING_CONST(CAPSTR_CATEGORY_SET_THING_ID, "SET_THING_ID");
+CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
 CAPSTRING_CONST(CAPSTR_CATEGORY_ALIVE, "ALIVE");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, TOPIC_SEPERATOR);
 
+CAPSTRING_CONST(CAPSTR_REGISTER_RESULT, "MT/REGISTER_RESULT/");
+CAPSTRING_CONST(CAPSTR_UNREGISTER_RESULT, "MT/UNREGISTER_RESULT/");
+
+CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
+{
+	cap_result result = ERR_CAP_UNKNOWN;
+	SThingManager* pstThingManager = NULL;
+    int nAliveCheckingPeriod = 0;
+	int nArrayLength = 0;
+    int nLoop = 0;
+    long long llCurrTime = 0;
+    long long llLatestTime = 0;
+    long long llAliveCycle = 0;
+
+	IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+	pstThingManager = (SThingManager *)pUserData;
+
+	nAliveCheckingPeriod = pstThingManager->nAliveCheckingPeriod;
+
+	while (g_bExit == FALSE) {
+		//timeout doesn't count as an error
+		result = CAPThreadEvent_WaitTimeEvent(pstThingManager->hEvent, (long long) nAliveCheckingPeriod*SECOND);
+		if(result == ERR_CAP_TIME_EXPIRED)
+		{
+		    result = ERR_CAP_NOERROR;
+		}
+		ERRIFGOTO(result, _EXIT);
+
+        /*
+        result = DBHandler_MakeThingAliveInfoArray(&pstThingManager->pstThingAliveInfoArray, &nArrayLength);
+        ERRIFGOTO(result, _EXIT);
+        */
+
+        //If there is no thing in database, continue
+        if(pstThingManager->pstThingAliveInfoArray == NULL)
+            continue;
+
+        for(nLoop = 0; nLoop < nArrayLength; nLoop++){
+            llLatestTime = pstThingManager->pstThingAliveInfoArray[nLoop].llLatestTime;
+            
+            //Minor Adjustment to alive cycle considering network overhead
+            llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].nAliveCycle * 1000 + 1 * SECOND;
+
+            result = CAPTime_GetCurTimeInMilliSeconds(&llCurrTime);
+            ERRIFGOTO(result, _EXIT);
+           
+            if(llCurrTime - llLatestTime > llAliveCycle){
+                /*
+                //TODO
+                //disable scenarios
+                result = DBHandler_DeleteThing(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId);
+                ERRIFGOTO(result, _EXIT);
+                */
+
+                CAPLogger_Write(g_hLogger, MSG_INFO, "ThingManager has unregistered %s for not receiving alive message.",\
+                        CAPString_LowPtr(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId, NULL));
+            }
+        }
+        //Free all the memory of ThingAliveInfoArray 
+        for (nLoop = 0; nLoop < nArrayLength; nLoop++) {
+            SAFE_CAPSTRING_DELETE(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId);
+        }
+        SAFEMEMFREE(pstThingManager->pstThingAliveInfoArray);
+    }
+
+    result = ERR_CAP_NOERROR;
+
+_EXIT:
+    if(result != ERR_CAP_NOERROR && pstThingManager != NULL && pstThingManager->pstThingAliveInfoArray != NULL){
+        //Free all the memory of ThingAliveInfoArray 
+        for (nLoop = 0; nLoop < nArrayLength; nLoop++) {
+            SAFE_CAPSTRING_DELETE(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId);
+        }
+        SAFEMEMFREE(pstThingManager->pstThingAliveInfoArray);
+    }
+
+    CAP_THREAD_END;
+}
+
 static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hThingManager, cap_string strMessageReceiverId, cap_string strTopicCategory)
 {
-
     cap_result result = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
     cap_string strTopic = NULL;
@@ -113,30 +192,28 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     cap_result result_save = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
     cap_string strCategory = NULL;
-    //SThingInfo* pstThing = NULL;
     cap_string strThingId = NULL;
 
     IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     pstThingManager = (SThingManager*)pUserData;
 
+    /*Topics are set as follow
+     *[TM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
+     */
+
+    //Get Category
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
     ERRIFGOTO(result, _EXIT);
-
-    /*
-    //assign thing id from linked_list (topic_level_third)
-    result = getLastElementFromTopicList(hTopicItemList, &strThingId);
+   
+    //Get Thing ID
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strThingId);
     ERRIFGOTO(result, _EXIT);
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_REGISTER) == TRUE) {
-        //create thing_Handler
-        result = ThingHandler_Create(CAPString_LowPtr(strThingId, NULL), CAPString_Length(strThingId), &pstThing);
-        ERRIFGOTO(result, _EXIT);
-
-        //insert thing_handler
-        result = ThingHandler_Insert(pstThing, pszPayload, nPayloadLen);
-        ERRIFGOTO(result, _EXIT);
-
+        dlp("REGISTER RECEIVED!!\n");
+        dlp("received : %s\n", pszPayload);
+        /*
         //add thing into DB
         result = DBHandler_AddThing(pstThing);
 
@@ -154,18 +231,13 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strThingId, NULL));
             ERRIFGOTO(result, _EXIT);
 
-            //subscribe sensor topic
-            result = ThingManager_PutValueTopicToQueue(pstThingManager, pstThing);
-            ERRIFGOTO(result, _EXIT);
-
-            //make payload to Cloud
-            result = makeMessageToCloud(pstThingManager, strCategory, strThingId, pszPayload, nPayloadLen);
-            ERRIFGOTO(result, _EXIT);
         }
-        result = ThingHandler_Destroy(&pstThing);
-        ERRIFGOTO(result, _EXIT);
+        */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_UNREGISTER) == TRUE) {
+        dlp("UNREGISTER RECEIVED!!\n");
+        dlp("received : %s\n", pszPayload);
+        /*
         result = disableDependentScenario(strThingId, pstThingManager->hAppEngine);
         ERRIFGOTO(result, _EXIT);
             
@@ -183,12 +255,20 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             result = makeMessageToCloud(pstThingManager, strCategory, strThingId, pszPayload, nPayloadLen);
             ERRIFGOTO(result, _EXIT);
         }
+        */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_ALIVE) == TRUE) {
+        dlp("ALIVE RECEIVED!!\n");
+        dlp("received : %s\n", pszPayload);
+        /*
         result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strThingId, NULL));
         ERRIFGOTO(result, _EXIT);
+        */
     }
-    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SET_THING_ID) == TRUE) {
+    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
+        dlp("SEND_VARIABLE RECEIVED!!\n");
+        dlp("received : %s\n", pszPayload);
+        /*
         result = DBHandler_SetVirtualThingId(pszPayload, nPayloadLen);
 
         //Save result to check if an error occured
@@ -205,12 +285,12 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             result = makeMessageToCloud(pstThingManager, strCategory, strThingId, pszPayload, nPayloadLen);
             ERRIFGOTO(result, _EXIT);
         }
+        */
     }
     else {
 
         //ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
     }
-    */
     result = ERR_CAP_NOERROR;
 
 _EXIT:
@@ -230,17 +310,15 @@ cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string str
 
     pstThingManager = (SThingManager*)malloc(sizeof(SThingManager));
     ERRMEMGOTO(pstThingManager, result, _EXIT);
-/*
+    
     pstThingManager->enID = HANDLEID_THING_MANAGER;
     pstThingManager->bCreated = FALSE;
     pstThingManager->hAliveHandlingThread = NULL;
     pstThingManager->pstThingAliveInfoArray = NULL;
-    pstThingManager->hMessageToCloudQueue = NULL;
     pstThingManager->hEvent = NULL;
     pstThingManager->hMQTTHandler = NULL;
-    pstThingManager->hAppEngine = NULL;
-    pstThingManager->nAliveCheckingPeriod = DEFAULT_ALIVE_CHECK_TIME;
-*/
+    pstThingManager->nAliveCheckingPeriod = 0;
+    
     //create event for timedwait
     result = CAPThreadEvent_Create(&pstThingManager->hEvent);
     ERRIFGOTO(result, _EXIT);
@@ -254,14 +332,13 @@ cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string str
     result = ERR_CAP_NOERROR;
 _EXIT:
     if (result != ERR_CAP_NOERROR && pstThingManager != NULL) {
-        //Destroy lock before deallocating pstThingManager
         CAPThreadEvent_Destroy(&(pstThingManager->hEvent));
         SAFEMEMFREE(pstThingManager);
     }
     return result;
 }
 
-cap_result ThingManager_Run(IN cap_handle hThingManager)
+cap_result ThingManager_Run(IN cap_handle hThingManager, IN int nAliveCheckingPeriod)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
@@ -275,11 +352,6 @@ cap_result ThingManager_Run(IN cap_handle hThingManager)
     if (pstThingManager->bCreated == TRUE) {
         CAPASSIGNGOTO(result, ERR_CAP_NOERROR, _EXIT);
     }
-
-    /*
-    pstThingManager->hValueTopicQueue = hValueTopicQueue;
-    pstThingManager->hMessageToCloudQueue = hMessageToCloudQueue;
-    pstThingManager->hAppEngine = hAppEngine;
 
     result = MQTTMessageHandler_SetReceiveCallback(pstThingManager->hMQTTHandler,
             mqttMessageHandlingCallback, pstThingManager);
@@ -296,7 +368,6 @@ cap_result ThingManager_Run(IN cap_handle hThingManager)
     //pstAliveHandlingThreadData will be freed in a thread
     result = CAPThread_Create(aliveHandlingThread, pstThingManager, &(pstThingManager->hAliveHandlingThread));
     ERRIFGOTO(result, _EXIT);
-    */
 
     pstThingManager->bCreated = TRUE;
 
@@ -319,7 +390,6 @@ cap_result ThingManager_Join(IN cap_handle hThingManager)
 
     pstThingManager = (SThingManager*)hThingManager;
 
-    /*
     if (pstThingManager->bCreated == TRUE) {
         result = CAPThreadEvent_SetEvent(pstThingManager->hEvent);
         ERRIFGOTO(result, _EXIT);
@@ -332,7 +402,6 @@ cap_result ThingManager_Join(IN cap_handle hThingManager)
 
         pstThingManager->bCreated = FALSE;
     }
-    */
 
     result = ERR_CAP_NOERROR;
 _EXIT:
@@ -352,12 +421,9 @@ cap_result ThingManager_Destroy(IN OUT cap_handle* phThingManager)
 
     pstThingManager = (SThingManager*)*phThingManager;
 
-    /*
     MQTTMessageHandler_Destroy(&(pstThingManager->hMQTTHandler));
 
     CAPThreadEvent_Destroy(&(pstThingManager->hEvent));
-
-    */
 
     SAFEMEMFREE(pstThingManager);
 

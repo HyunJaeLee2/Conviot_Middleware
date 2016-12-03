@@ -26,17 +26,14 @@ typedef struct _SThingManager {
     cap_bool bCreated;
     cap_handle hAliveHandlingThread;
     cap_handle hMQTTHandler;
-    cap_handle hPingLock;
     cap_handle hEvent;
     SThingAliveInfo *pstThingAliveInfoArray;
-    cap_handle hMessageToCloudQueue;
-    cap_handle hAppEngine;
     int nAliveCheckingPeriod;
 } SThingManager;
 
 
 cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string strBrokerURI);
-cap_result ThingManager_Run(IN cap_handle hThingManager);
+cap_result ThingManager_Run(IN cap_handle hThingManager, IN int nAliveCheckingPeriod);
 cap_result ThingManager_Join(IN cap_handle hThingManager);
 cap_result ThingManager_Destroy(IN OUT cap_handle* phThingManager);
 

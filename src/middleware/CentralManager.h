@@ -15,6 +15,7 @@ typedef struct _SConfigData{
 	int nLogMaxSize;
 	int nLogBackupNum;
     int nSocketListeningPort;
+    int nAliveCheckingPeriod;
 } SConfigData;
 
 

@@ -16,35 +16,23 @@
 //#include "DBHandler.h"
 #include "MQTTMessageHandler.h"
 
-#define MQTT_CLIENT_ID "cap_iot_middleware_app_runner"
+#define MQTT_CLIENT_ID "Conviot_AppManager"
 #define MQTT_CLIENT_DISCONNECT_TIMEOUT (10000)
 #define MQTT_RECEIVE_TIMEOUT (3000)
 #define MQTT_SUBSCRIPTION_NUM (sizeof(paszAppManagerSubcriptionList) / sizeof(char*))
 
 static char* paszAppManagerSubcriptionList[] = {
-    "EM/ADD_SCENARIO/#",
-    "EM/DELETE_SCENARIO/#",
-    "EM/RUN_SCENARIO/#",
-    "EM/STOP_SCENARIO/#",
-    "EM/ACTUATE/#",
-    "EM/VERIFY_SCENARIO/#"
+    "TM/SEND_VARIABLE/#",
+    "TM/FUNRTION_RESULT/#",
 };
 
 
 CAPSTRING_CONST(CAPSTR_MQTT_CLIENT_ID, MQTT_CLIENT_ID);
-CAPSTRING_CONST(CAPSTR_SCENARIO_RESULT, "ME/RESULT/SCENARIO/");
-CAPSTRING_CONST(CAPSTR_SCENARIO_ADD_RESULT, "ME/RESULT/ADD_SCENARIO/");
-CAPSTRING_CONST(CAPSTR_SCENARIO_VERIFY_RESULT, "ME/RESULT/VERIFY_SCENARIO/");
-CAPSTRING_CONST(CAPSTR_SCENARIO_DELETE_RESULT, "ME/RESULT/DELETE_SCENARIO/");
-CAPSTRING_CONST(CAPSTR_ACTUATE_RESULT, "ME/RESULT/ACTUATE/");
-CAPSTRING_CONST(CAPSTR_SCENARIO_RUN_RESULT, "ME/RESULT/RUN_SCENARIO/");
-CAPSTRING_CONST(CAPSTR_SCENARIO_STOP_RESULT, "ME/RESULT/STOP_SCENARIO/");
 
-CAPSTRING_CONST(CAPSTR_CATEGORY_ADD_SCENARIO, "ADD_SCENARIO");
-CAPSTRING_CONST(CAPSTR_CATEGORY_DELETE_SCENARIO, "DELETE_SCENARIO");
-CAPSTRING_CONST(CAPSTR_CATEGORY_RUN_SCENARIO, "RUN_SCENARIO");
-CAPSTRING_CONST(CAPSTR_CATEGORY_STOP_SCENARIO, "STOP_SCENARIO");
-CAPSTRING_CONST(CAPSTR_CATEGORY_VERIFY_SCENARIO, "VERIFY_SCENARIO");
+CAPSTRING_CONST(CAPSTR_CATEGORY_FUNCTION_RESULT, "FUNCTION_RESULT");
+CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
+
+CAPSTRING_CONST(CAPSTR_SCENARIO_RESULT, "MT/REQUEST_FUNCTION/");
 
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, "/");
 CAPSTRING_CONST(CAPSTR_MT, "MT/");
@@ -119,7 +107,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
 {
     cap_result result = ERR_CAP_UNKNOWN;
     cap_string strCategory = NULL;
-    cap_string strClientId = NULL;
+    cap_string strThingId = NULL;
 
     SAppManager* pstAppManager = NULL;
 
@@ -129,38 +117,26 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
 
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
     ERRIFGOTO(result, _EXIT);
-/*
+    
+    /*Topics are set as follow
+     *[TM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
+     */
 
-    //assign ID for result publishing purpose
-    result = getLastElementFromTopicList(hTopicItemList, &strClientId);
+    //Get Category
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
+    ERRIFGOTO(result, _EXIT);
+   
+    //Get Thing ID
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strThingId);
     ERRIFGOTO(result, _EXIT);
 
-    if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_ADD_SCENARIO) == TRUE) {
-        result = addScenario(pstAppManager, strClientId, pszPayload, nPayloadLen);
-        ERRIFGOTO(result, _EXIT);
+    if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
     }
-    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_DELETE_SCENARIO) == TRUE) {
-        int nScenarioId = atoi(pszPayload);
-
-        result = deleteScenarioById(pstAppManager, strClientId, nScenarioId);
-        ERRIFGOTO(result, _EXIT);
-    }
-    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_RUN_SCENARIO) == TRUE) {
-        result = runScenario(pstAppManager, strClientId, pszPayload, nPayloadLen);
-        ERRIFGOTO(result, _EXIT);
-    }
-    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_STOP_SCENARIO) == TRUE) {
-        result = stopScenario(pstAppManager, strClientId, pszPayload, nPayloadLen);
-        ERRIFGOTO(result, _EXIT);
-    }
-    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_VERIFY_SCENARIO) == TRUE) {
-        result = verifyScenario(pstAppManager, strClientId, pszPayload, nPayloadLen);
-        ERRIFGOTO(result, _EXIT);
+    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_FUNCTION_RESULT) == TRUE) {
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
     }
-*/
     result = ERR_CAP_NOERROR;
 
 _EXIT:
@@ -174,7 +150,6 @@ cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerU
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SAppManager* pstAppManager = NULL;
-    SAppManagerCallbackData *pstCallback = NULL;
 
     IFVARERRASSIGNGOTO(phAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
@@ -183,29 +158,8 @@ cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerU
 
     pstAppManager->enID = HANDLEID_APP_MANAGER;
     pstAppManager->bCreated = FALSE;
-    pstAppManager->hAppRunnerList = NULL;
     pstAppManager->strBrokerURI = NULL;
     pstAppManager->hMQTTHandler = NULL;
-    pstAppManager->pstCallback = NULL;
-
-    pstCallback = (SAppManagerCallbackData *) malloc(sizeof(SAppManagerCallbackData));
-    ERRMEMGOTO(pstCallback, result, _EXIT);
-
-    pstCallback->strPayload = NULL;
-    pstCallback->strScenarioName = NULL;
-    pstCallback->strScenarioText = NULL;
-    pstCallback->strError = NULL;
-
-    pstCallback->strPayload = CAPString_New();
-    ERRMEMGOTO(pstCallback->strPayload, result, _EXIT);
-    pstCallback->strScenarioName = CAPString_New();
-    ERRMEMGOTO(pstCallback->strScenarioName, result, _EXIT);
-    pstCallback->strScenarioText = CAPString_New();
-    ERRMEMGOTO(pstCallback->strScenarioText, result, _EXIT);
-    pstCallback->strError = CAPString_New();
-    ERRMEMGOTO(pstCallback->strError, result, _EXIT);
-
-    pstAppManager->pstCallback = pstCallback;
 
     pstAppManager->strBrokerURI = CAPString_New();
     ERRMEMGOTO(pstAppManager->strBrokerURI, result, _EXIT);
@@ -225,13 +179,6 @@ _EXIT:
         //Destroy lock before deallocating pstThingMgmr
         if(pstAppManager != NULL){
             SAFE_CAPSTRING_DELETE(pstAppManager->strBrokerURI);
-            if(pstCallback != NULL) {
-                SAFE_CAPSTRING_DELETE(pstCallback->strError);
-                SAFE_CAPSTRING_DELETE(pstCallback->strPayload);
-                SAFE_CAPSTRING_DELETE(pstCallback->strScenarioName);
-                SAFE_CAPSTRING_DELETE(pstCallback->strScenarioText);
-                SAFEMEMFREE(pstCallback);
-            }
         }
         SAFEMEMFREE(pstAppManager);
     }
@@ -308,18 +255,7 @@ cap_result AppManager_Destroy(IN OUT cap_handle* phAppManager)
 
     MQTTMessageHandler_Destroy(&(pstAppManager->hMQTTHandler));
 
-    CAPLinkedList_Destroy(&(pstAppManager->hAppRunnerList));
-
     SAFE_CAPSTRING_DELETE(pstAppManager->strBrokerURI);
-
-    if(pstAppManager->pstCallback != NULL)
-    {
-        SAFE_CAPSTRING_DELETE(pstAppManager->pstCallback->strError);
-        SAFE_CAPSTRING_DELETE(pstAppManager->pstCallback->strPayload);
-        SAFE_CAPSTRING_DELETE(pstAppManager->pstCallback->strScenarioName);
-        SAFE_CAPSTRING_DELETE(pstAppManager->pstCallback->strScenarioText);
-        SAFEMEMFREE(pstAppManager->pstCallback);
-    }
 
     SAFEMEMFREE(pstAppManager);
 
