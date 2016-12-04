@@ -23,10 +23,6 @@
 
 #include "MQTTMessageHandler.h"
 
-#define LOG_COUNT 0
-
-int nCount = 0;
-
 #define MQTT_CLIENT_DISCONNECT_TIMEOUT (10000)
 
 static CALLBACK cap_result mqttDataDestroy(void* pData, void* pUsrData)
@@ -241,12 +237,7 @@ static CALLBACK void deliveredCallBack(void *pHandler, MQTTClient_deliveryToken 
     {
 
         pstHandler = (SMQTTMessageHandler*) pHandler;
-        if(nCount == LOG_COUNT){
-            CAPLogger_Write(g_hLogger, MSG_DETAIL, "MQTTClient_publish with token %d delivery confirmed", nConfirmedToken);
-            nCount = 0;
-        }else{
-            nCount++;
-        }
+        CAPLogger_Write(g_hLogger, MSG_DETAIL, "MQTTClient_publish with token %d delivery confirmed", nConfirmedToken);
         
         pstHandler->nDeliveredToken = nConfirmedToken;
     }
@@ -350,14 +341,8 @@ static CAP_THREAD_HEAD MQTTMessageHandlingThread(IN void* pHandler)
         result = divideTopicNameToList(strTopic, hTopicLinkedList);
         ERRIFGOTO(result, _EXIT);
         
-        if(nCount == LOG_COUNT){
-            CAPLogger_Write(g_hLogger, MSG_DETAIL, "MQTTMessageHandler Received message!");
-            CAPLogger_Write(g_hLogger, MSG_DEBUG, "topic : %s\npayload : %s", pstMQTTData->pszTopic, pstMQTTData->pszPayload);
-            nCount = 0;
-        }else{
-            nCount++;
-        }
-
+        CAPLogger_Write(g_hLogger, MSG_DETAIL, "MQTTMessageHandler Received message!");
+        CAPLogger_Write(g_hLogger, MSG_DEBUG, "topic : %s\npayload : %s", pstMQTTData->pszTopic, pstMQTTData->pszPayload);
 
         if(pstHandler->fnCallback != NULL)
         {
@@ -506,14 +491,8 @@ cap_result MQTTMessageHandler_Publish(cap_handle hHandler, cap_string strTopic, 
         ERRASSIGNGOTO(result, ERR_CAP_NET_SEND_ERROR, _EXIT);
     }
 
-    if(nCount == LOG_COUNT) {
-        CAPLogger_Write(g_hLogger, MSG_DEBUG, "Waiting for message publication!");
-        CAPLogger_Write(g_hLogger, MSG_DEBUG, "topic : %s\npayload : %s token : %d", CAPString_LowPtr(strTopic, NULL), pszPayload, nToken);
-        nCount = 0;
-    }
-    else {
-        nCount++;
-    }
+    CAPLogger_Write(g_hLogger, MSG_DEBUG, "Waiting for message publication!");
+    CAPLogger_Write(g_hLogger, MSG_DEBUG, "topic : %s\npayload : %s token : %d", CAPString_LowPtr(strTopic, NULL), pszPayload, nToken);
 
     while(pstHandler->nDeliveredToken != nToken) {
         if(pstHandler->nPublishWaitTime > 0) {

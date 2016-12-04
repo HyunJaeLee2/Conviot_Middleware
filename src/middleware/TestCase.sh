@@ -1,68 +1,90 @@
-echo "##1.Register existing things"
-mosquitto_pub -t "TM/REGISTER/thing1" -m "
+echo "##1.Register non existing thing"
+mosquitto_pub -t "TM/REGISTER/mydummydevice" -m "
 {
-   \"api_key\": \"aslkgjlaksdjgl\",
+   \"pincode\": \"customer1_pin_code_1\",
+   \"apikey\": \"1738f8e78548ef89d6bdd27ccda0fcfe61f393a50d6ea674+12341324\",
 }"
 
 sleep 1
 
-mosquitto_pub -t "TM/REGISTER/thing2" -m "
+echo "##2.Register thing with incorrect api key"
+mosquitto_pub -t "TM/REGISTER/customer1_device_id_1" -m "
 {
-   \"api_key\": \"aslkgjlaksdjgl\",
+   \"pincode\": \"customer1_pin_code_1\",
+   \"apikey\": \"1738f8e78548ef89d6bdd27ccda0fcfe61f393a50d6ea674+12341324\",
 }"
 
 sleep 1
 
-mosquitto_pub -t "TM/REGISTER/thing3" -m "
+echo "##3.Register thing with non existing pincode"
+mosquitto_pub -t "TM/REGISTER/customer1_device_id_1" -m "
 {
-   \"api_key\": \"aslkgjlaksdjgl\",
+   \"pincode\": \"customer1_pin_code_1+1234\",
+   \"apikey\": \"1738f8e78548ef89d6bdd27ccda0fcfe61f393a50d6ea674\",
 }"
 
 sleep 1
 
-echo "##2. unregister thing "
-sleep 2
-mosquitto_pub -t "TM/UNREGISTER/thing3" -m "
+echo "##4.Register thing with correct api key and pincode"
+
+mosquitto_pub -t "TM/REGISTER/customer1_device_id_1" -m "
 {
-   \"api_key\": \"aslkgjlaksdjgl\",
+   \"pincode\": \"customer1_pin_code_1\",
+   \"apikey\": \"1738f8e78548ef89d6bdd27ccda0fcfe61f393a50d6ea674\",
 }"
 
 sleep 1
-mosquitto_pub -t "TM/UNREGISTER/thing1" -m "
-{
-   \"api_key\": \"aslkgjlaksdjgl\",
-}"
-sleep 1
-
-echo "##3. alive thing"
-sleep 2
-mosquitto_pub -t "TM/ALIVE/thing3" -m "
-{
-   \"api_key\": \"aslkgjlaksdjgl\",
-}"
-
-sleep 1
-mosquitto_pub -t "TM/ALIVE/thing1" -m "
-{
-   \"api_key\": \"aslkgjlaksdjgl\",
-}"
-sleep 1
-
-echo "##4. send variable"
-sleep 2
-mosquitto_pub -t "TM/SEND_VARIABLE/thing3/motion" -m "
-{
-   \"value\": \"dummy\",
-   \"api_key\": \"aslkgjlaksdjgl\",
-}"
-
-sleep 1
-mosquitto_pub -t "TM/SEND_VARIABLE/thing1/temperature" -m "
-{
-   \"value\": \"13\",
-   \"api_key\": \"aslkgjlaksdjgl\",
-}"
-sleep 1
+#
+#mosquitto_pub -t "TM/REGISTER/thing3" -m "
+#{
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#
+#sleep 1
+#
+#echo "##2. unregister thing "
+#sleep 2
+#mosquitto_pub -t "TM/UNREGISTER/thing3" -m "
+#{
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#
+#sleep 1
+#mosquitto_pub -t "TM/UNREGISTER/thing1" -m "
+#{
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#sleep 1
+#
+#echo "##3. alive thing"
+#sleep 2
+#mosquitto_pub -t "TM/ALIVE/thing3" -m "
+#{
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#
+#sleep 1
+#mosquitto_pub -t "TM/ALIVE/thing1" -m "
+#{
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#sleep 1
+#
+#echo "##4. send variable"
+#sleep 2
+#mosquitto_pub -t "TM/SEND_VARIABLE/thing3/motion" -m "
+#{
+#   \"value\": \"dummy\",
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#
+#sleep 1
+#mosquitto_pub -t "TM/SEND_VARIABLE/thing1/temperature" -m "
+#{
+#   \"value\": \"13\",
+#   \"api_key\": \"aslkgjlaksdjgl\",
+#}"
+#sleep 1
 
 #echo "##2. register duplicated thing(error message will show up) "
 #sleep 3

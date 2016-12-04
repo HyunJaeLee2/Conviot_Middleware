@@ -99,17 +99,17 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
                 /*
                 //TODO
                 //disable scenarios
-                result = DBHandler_DeleteThing(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId);
+                result = DBHandler_DeleteThing(pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);
                 ERRIFGOTO(result, _EXIT);
                 */
 
                 CAPLogger_Write(g_hLogger, MSG_INFO, "ThingManager has unregistered %s for not receiving alive message.",\
-                        CAPString_LowPtr(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId, NULL));
+                        CAPString_LowPtr(pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId, NULL));
             }
         }
         //Free all the memory of ThingAliveInfoArray 
         for (nLoop = 0; nLoop < nArrayLength; nLoop++) {
-            SAFE_CAPSTRING_DELETE(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId);
+            SAFE_CAPSTRING_DELETE(pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);
         }
         SAFEMEMFREE(pstThingManager->pstThingAliveInfoArray);
     }
@@ -120,7 +120,7 @@ _EXIT:
     if(result != ERR_CAP_NOERROR && pstThingManager != NULL && pstThingManager->pstThingAliveInfoArray != NULL){
         //Free all the memory of ThingAliveInfoArray 
         for (nLoop = 0; nLoop < nArrayLength; nLoop++) {
-            SAFE_CAPSTRING_DELETE(pstThingManager->pstThingAliveInfoArray[nLoop].strThingId);
+            SAFE_CAPSTRING_DELETE(pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);
         }
         SAFEMEMFREE(pstThingManager->pstThingAliveInfoArray);
     }
@@ -191,8 +191,10 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     cap_result result = ERR_CAP_UNKNOWN;
     cap_result result_save = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
+    json_object* pJsonObject, *pJsonApiKey;
+    const char* pszApiKey = "apikey";
     cap_string strCategory = NULL;
-    cap_string strThingId = NULL;
+    cap_string strDeviceId = NULL;
 
     IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
@@ -207,12 +209,34 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     ERRIFGOTO(result, _EXIT);
    
     //Get Thing ID
-    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strThingId);
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strDeviceId);
     ERRIFGOTO(result, _EXIT);
+    
+    //Parse Payload to check its api key
+    result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
+    ERRIFGOTO(result, _EXIT);
+   
+    if (!json_object_object_get_ex(pJsonObject, pszApiKey, &pJsonApiKey)) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+
+    //save result to report error later
+    //ERR_CAP_NO_DATA : no matching device
+    //ERR_CAP_INVALID_DATA : api key doesn't match
+    result_save = DBHandler_VerifyApiKey(strDeviceId, json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_REGISTER) == TRUE) {
         dlp("REGISTER RECEIVED!!\n");
         dlp("received : %s\n", pszPayload);
+
+        //If api key error has occured, publish error code then return 
+        if(result_save != ERR_CAP_NOERROR){
+            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
+            ERRIFGOTO(result, _EXIT);
+
+            goto _EXIT;
+        }
+        
         /*
         //add thing into DB
         result = DBHandler_AddThing(pstThing);
@@ -220,17 +244,16 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         //Save result to check if an error occured
         result_save = result;
         
-        result = ThingManager_PublishErrorCode(result, pstThingManager, strThingId, CAPSTR_REGACK);
+        result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGACK);
         ERRIFGOTO(result, _EXIT);
-       
+        
         if(result_save == ERR_CAP_NOERROR){
-            result = handleDisabledScenario(strThingId, pstThingManager->hAppEngine);
+            result = handleDisabledScenario(strDeviceId, pstThingManager->hAppEngine);
             ERRIFGOTO(result, _EXIT);
             
             //update latest time when register
-            result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strThingId, NULL));
+            result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strDeviceId, NULL));
             ERRIFGOTO(result, _EXIT);
-
         }
         */
     }
@@ -238,21 +261,21 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         dlp("UNREGISTER RECEIVED!!\n");
         dlp("received : %s\n", pszPayload);
         /*
-        result = disableDependentScenario(strThingId, pstThingManager->hAppEngine);
+        result = disableDependentScenario(strDeviceId, pstThingManager->hAppEngine);
         ERRIFGOTO(result, _EXIT);
             
         //delete thing from DB
-        result = DBHandler_DeleteThing(strThingId);
+        result = DBHandler_DeleteThing(strDeviceId);
 
         //Save result to check if an error occured
         result_save = result;
         
-        result = ThingManager_PublishErrorCode(result, pstThingManager, strThingId, CAPSTR_REGACK);
+        result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGACK);
         ERRIFGOTO(result, _EXIT);
         
         if(result_save == ERR_CAP_NOERROR){
             //make payload to Cloud
-            result = makeMessageToCloud(pstThingManager, strCategory, strThingId, pszPayload, nPayloadLen);
+            result = makeMessageToCloud(pstThingManager, strCategory, strDeviceId, pszPayload, nPayloadLen);
             ERRIFGOTO(result, _EXIT);
         }
         */
@@ -261,7 +284,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         dlp("ALIVE RECEIVED!!\n");
         dlp("received : %s\n", pszPayload);
         /*
-        result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strThingId, NULL));
+        result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strDeviceId, NULL));
         ERRIFGOTO(result, _EXIT);
         */
     }
@@ -275,14 +298,14 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result_save = result;
         
         //TODO
-        //Third argument(strThingID) should be named as strClientId.
+        //Third argument(strDeviceId) should be named as strClientId.
         //However, since middleware retrieves ID from the end of the topic element, it works fine functionally.
-        result = ThingManager_PublishErrorCode(result, pstThingManager, strThingId, CAPSTR_SET_THING_ID_RESULT);
+        result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_SET_THING_ID_RESULT);
         ERRIFGOTO(result, _EXIT);
         
         if(result_save == ERR_CAP_NOERROR){
             //make payload to Cloud
-            result = makeMessageToCloud(pstThingManager, strCategory, strThingId, pszPayload, nPayloadLen);
+            result = makeMessageToCloud(pstThingManager, strCategory, strDeviceId, pszPayload, nPayloadLen);
             ERRIFGOTO(result, _EXIT);
         }
         */
