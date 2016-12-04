@@ -192,7 +192,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     cap_result result_save = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
     json_object* pJsonObject, *pJsonApiKey;
-    const char* pszApiKey = "apikey";
+    const char* pszConstApiKey = "apikey";
     cap_string strCategory = NULL;
     cap_string strDeviceId = NULL;
 
@@ -216,7 +216,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
     ERRIFGOTO(result, _EXIT);
    
-    if (!json_object_object_get_ex(pJsonObject, pszApiKey, &pJsonApiKey)) {
+    if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey)) {
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }
 
@@ -226,10 +226,25 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     result_save = DBHandler_VerifyApiKey(strDeviceId, json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_REGISTER) == TRUE) {
+        json_object* pJsonPinCode;
+        const char* pszConstPinCode = "pincode";
         dlp("REGISTER RECEIVED!!\n");
         dlp("received : %s\n", pszPayload);
 
         //If api key error has occured, publish error code then return 
+        if(result_save != ERR_CAP_NOERROR){
+            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
+            ERRIFGOTO(result, _EXIT);
+
+            goto _EXIT;
+        }
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstPinCode, &pJsonPinCode)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+
+        //If register error has occured, publish error code then return
+        result_save = DBHandler_RegisterDevice(strDeviceId, json_object_get_string(pJsonPinCode));  
         if(result_save != ERR_CAP_NOERROR){
             result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
