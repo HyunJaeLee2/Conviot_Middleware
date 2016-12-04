@@ -23,9 +23,8 @@
 
 #include "ThingManager.h"
 #include "MQTTMessageHandler.h"
-/*
 #include "DBHandler.h"
-*/
+
 #define SECOND 1000
 
 static char* paszThingManagerSubcriptionList[] = {
@@ -220,16 +219,17 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }
 
+    //TODO
+    //Add Error code to each specific situation
+
     //save result to report error later
     //ERR_CAP_NO_DATA : no matching device
     //ERR_CAP_INVALID_DATA : api key doesn't match
-    result_save = DBHandler_VerifyApiKey(strDeviceId, json_object_get_string(pJsonApiKey));
+    result_save = DBHandler_VerifyApiKey(strDeviceId, (char *)json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_REGISTER) == TRUE) {
         json_object* pJsonPinCode;
         const char* pszConstPinCode = "pincode";
-        dlp("REGISTER RECEIVED!!\n");
-        dlp("received : %s\n", pszPayload);
 
         //If api key error has occured, publish error code then return 
         if(result_save != ERR_CAP_NOERROR){
@@ -244,7 +244,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
 
         //If register error has occured, publish error code then return
-        result_save = DBHandler_RegisterDevice(strDeviceId, json_object_get_string(pJsonPinCode));  
+        result_save = DBHandler_RegisterDevice(strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
         if(result_save != ERR_CAP_NOERROR){
             result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
@@ -253,15 +253,6 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
         
         /*
-        //add thing into DB
-        result = DBHandler_AddThing(pstThing);
-
-        //Save result to check if an error occured
-        result_save = result;
-        
-        result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGACK);
-        ERRIFGOTO(result, _EXIT);
-        
         if(result_save == ERR_CAP_NOERROR){
             result = handleDisabledScenario(strDeviceId, pstThingManager->hAppEngine);
             ERRIFGOTO(result, _EXIT);
@@ -273,8 +264,30 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_UNREGISTER) == TRUE) {
-        dlp("UNREGISTER RECEIVED!!\n");
-        dlp("received : %s\n", pszPayload);
+        json_object* pJsonPinCode;
+        const char* pszConstPinCode = "pincode";
+        
+        //If api key error has occured, publish error code then return 
+        if(result_save != ERR_CAP_NOERROR){
+            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
+            ERRIFGOTO(result, _EXIT);
+
+            goto _EXIT;
+        }
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstPinCode, &pJsonPinCode)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+
+        //If register error has occured, publish error code then return
+        result_save = DBHandler_UnregisterDevice(strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
+        if(result_save != ERR_CAP_NOERROR){
+            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
+            ERRIFGOTO(result, _EXIT);
+
+            goto _EXIT;
+        }
+        
         /*
         result = disableDependentScenario(strDeviceId, pstThingManager->hAppEngine);
         ERRIFGOTO(result, _EXIT);
