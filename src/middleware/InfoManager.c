@@ -31,6 +31,7 @@
 #define MQTT_SUBSCRIPTION_NUM (sizeof(paszInfoManagerSubcriptionList) / sizeof(char*))
 
 static char* paszInfoManagerSubcriptionList[] = {
+    "TM/TEMP/#"
 };
 
 

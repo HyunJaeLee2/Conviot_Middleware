@@ -8,6 +8,14 @@
 extern "C" {
 #endif
 
+typedef struct _SDBInfo{
+    char *pszDBHost;
+    char *pszDBUser;
+    char *pszDBPassword;
+    char *pszDBName;
+    int nDBPort;
+} SDBInfo;
+
 typedef struct _SConfigData{
     char *pszBrokerURI;
 	int nLogLevel;
@@ -16,6 +24,7 @@ typedef struct _SConfigData{
 	int nLogBackupNum;
     int nSocketListeningPort;
     int nAliveCheckingPeriod;
+    SDBInfo *pstDBInfo; 
 } SConfigData;
 
 

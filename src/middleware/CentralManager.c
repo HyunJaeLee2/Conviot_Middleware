@@ -15,10 +15,7 @@
 #include "ThingManager.h"
 #include "InfoManager.h"
 #include "AppManager.h"
-
-/*
 #include "DBHandler.h"
-*/
 
 static cap_handle hEvent;
 cap_bool g_bExit = FALSE;
@@ -58,10 +55,8 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigDat
     result = CAPString_SetLow(strBrokerURI, pstConfigData->pszBrokerURI, CAPSTRING_MAX);
     ERRIFGOTO(result, _EXIT);
 
-    /*
-    result = DBHandler_OpenDB(pszDBFileName);
+    result = DBHandler_OpenDB(pstConfigData->pstDBInfo);
     ERRIFGOTO(result, _EXIT);
-    */
 
     result = ThingManager_Create(&(pstCentralManager->hThingManager), strBrokerURI);
     ERRIFGOTO(result, _EXIT);
@@ -134,8 +129,8 @@ cap_result CentralManager_Destroy(IN OUT cap_handle *phCentralManager) {
     InfoManager_Destroy(&(pstCentralManager->hInfoManager));
     AppManager_Destroy(&(pstCentralManager->hAppManager));
     CAPThreadEvent_Destroy(&hEvent);
-
-    //DBHandler_CloseDB();
+   
+    DBHandler_CloseDB();
 
     SAFEMEMFREE(pstCentralManager);
 

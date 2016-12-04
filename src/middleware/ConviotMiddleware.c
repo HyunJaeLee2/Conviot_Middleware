@@ -9,6 +9,11 @@
 #define LOG_BACKUP_NUM "log_backup_num"
 #define SOCKET_LISTENING_PORT "socket_listening_port"
 #define ALIVE_CHECKING_PERIOD "alive_checking_period"
+#define DB_HOST "db_host"
+#define DB_USER "db_user"
+#define DB_PASSWORD "db_password"
+#define DB_NAME "db_name"
+#define DB_PORT "db_port"
 
 #define MB 1024*1024
 
@@ -45,6 +50,12 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
     config_init(cf);
 
 	char *pszConfigDirPath = NULL;
+    
+    const char *pszDBHost = NULL;
+    const char *pszDBUser = NULL;
+    const char *pszDBPassword = NULL;
+    const char *pszDBName = NULL;
+    int nDBPort = 0;
 
     if (!config_read_file(cf, pszConfigPath)) {
         fprintf(stderr, "%s:%d - %s %s\n",
@@ -85,6 +96,22 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
 	}
 
+    if (!config_lookup_string(cf, DB_HOST, &pszDBHost)){
+        fprintf(stderr, "db_host error\n");
+    }
+    if (!config_lookup_string(cf, DB_USER, &pszDBUser)){
+        fprintf(stderr, "db_user error\n");
+    }
+    if (!config_lookup_string(cf, DB_PASSWORD, &pszDBPassword)){
+        fprintf(stderr, "db_password error\n");
+    }
+    if (!config_lookup_string(cf, DB_NAME, &pszDBName)){
+        fprintf(stderr, "db_name error\n");
+    }
+	if (!config_lookup_int(cf, DB_PORT, &nDBPort)){
+		fprintf(stderr, "db_port error\n");
+	}
+
     //TODO
     //Get socket listening and connecting port then hand it to Infomanager
 
@@ -110,6 +137,13 @@ static int getConfigData(SConfigData *pstConfigData, char *pszConfigPath)
 
 	pstConfigData->nLogMaxSize = nLogMaxSize*MB;
 	pstConfigData->nLogBackupNum = nLogBackupNum;
+
+    pstConfigData->pstDBInfo->pszDBHost = strdup(pszDBHost);
+    pstConfigData->pstDBInfo->pszDBUser = strdup(pszDBUser);
+    pstConfigData->pstDBInfo->pszDBPassword = strdup(pszDBPassword);
+    pstConfigData->pstDBInfo->pszDBName = strdup(pszDBName);
+    pstConfigData->pstDBInfo->nDBPort = nDBPort;
+
 	
 	SAFEMEMFREE(pszConfigDirPath);
 	SAFEMEMFREE(pszLogPath);
@@ -125,6 +159,7 @@ int main(int argc, char* argv[])
 {
     cap_handle hCentralManager = NULL;
     SConfigData *pstConfigData = NULL;
+    SDBInfo *pstDBInfo = NULL;
     cap_result result = ERR_CAP_UNKNOWN;
 	cap_string strLogPrefix = NULL;
 
@@ -137,6 +172,11 @@ int main(int argc, char* argv[])
 
     pstConfigData = (SConfigData*)malloc(sizeof(SConfigData));
 	ERRMEMGOTO(pstConfigData, result, _EXIT);
+    
+    pstDBInfo = (SDBInfo*)malloc(sizeof(SDBInfo));
+	ERRMEMGOTO(pstDBInfo, result, _EXIT);
+
+    pstConfigData->pstDBInfo = pstDBInfo;
 
     result = getConfigData(pstConfigData, argv[1]);
 	ERRIFGOTO(result, _EXIT);
@@ -166,6 +206,11 @@ int main(int argc, char* argv[])
     ERRIFGOTO(result, _EXIT);
 
     SAFEMEMFREE(pstConfigData->pszBrokerURI);
+    SAFEMEMFREE(pstDBInfo->pszDBHost);
+    SAFEMEMFREE(pstDBInfo->pszDBPassword);
+    SAFEMEMFREE(pstDBInfo->pszDBUser);
+    SAFEMEMFREE(pstDBInfo->pszDBName);
+    SAFEMEMFREE(pstDBInfo);
 	SAFE_CAPSTRING_DELETE(pstConfigData->strLogFilePath);
 	SAFE_CAPSTRING_DELETE(strLogPrefix);
     SAFEMEMFREE(pstConfigData);
