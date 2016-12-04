@@ -19,6 +19,8 @@ cap_result DBHandler_CloseDB();
 cap_result DBHandler_VerifyApiKey(IN cap_string strDeviceId, IN char *pszApiKey);
 cap_result DBHandler_RegisterDevice(IN cap_string strDeviceId, IN char *pszPinCode);  
 cap_result DBHandler_UnregisterDevice(IN cap_string strDeviceId, IN char *pszPinCode);  
+cap_result DBHandler_UpdateLatestTime(IN cap_string strDeviceId);
+cap_result DBHandler_InsertVariable(IN cap_string strDeviceId, IN char * pszVariable);
 #ifdef __cplusplus
 }
 #endif

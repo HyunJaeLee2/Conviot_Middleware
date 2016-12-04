@@ -240,9 +240,62 @@ _EXIT:
 
 }
 
+cap_result DBHandler_UpdateLatestTime(IN cap_string strDeviceId) {
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    //check if device is registered to system 
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                device.is_connected\
+            FROM\
+                things_device device\
+            WHERE\
+                device.device_id = '%s';", CAPString_LowPtr(strDeviceId, NULL));
+
+    result = callQueryWithResult(g_pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no matching device with device id 
+    if(mysqlRow == NULL){
+        dlp("There is no matching device!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+
+    //if thing is not registered 
+    if(atoi(mysqlRow[0]) == FALSE){
+        dlp("Thing is not registered to system!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_DUPLICATED, _EXIT);
+    }
+
+    //TODO
+    //update latest time of device
+    /*
+    snprintf(query, QUERY_SIZE, "\
+            UPDATE\
+                things_device device\
+            SET\
+                device.is_connected = 0\
+            where\
+                device.pin_code = '%s';", pszPinCode);
+    */
+
+    result = callQuery(g_pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
 
 
-
+cap_result DBHandler_InsertVariable(IN cap_string strDeviceId, IN char * pszVariable) {
+    //TODO
+}
 
 
 

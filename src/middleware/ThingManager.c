@@ -309,38 +309,32 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_ALIVE) == TRUE) {
-        dlp("ALIVE RECEIVED!!\n");
-        dlp("received : %s\n", pszPayload);
-        /*
+        //If api key error has occured, goto exit 
+        if(result_save != ERR_CAP_NOERROR){
+            goto _EXIT;
+        }
+
+        //ignore error because alive message does not have a return type
         result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strDeviceId, NULL));
-        ERRIFGOTO(result, _EXIT);
-        */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
-        dlp("SEND_VARIABLE RECEIVED!!\n");
-        dlp("received : %s\n", pszPayload);
-        /*
-        result = DBHandler_SetVirtualThingId(pszPayload, nPayloadLen);
-
-        //Save result to check if an error occured
-        result_save = result;
+        json_object* pJsonVariable;
+        const char* pszConstVariable = "variable";
         
-        //TODO
-        //Third argument(strDeviceId) should be named as strClientId.
-        //However, since middleware retrieves ID from the end of the topic element, it works fine functionally.
-        result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_SET_THING_ID_RESULT);
-        ERRIFGOTO(result, _EXIT);
-        
-        if(result_save == ERR_CAP_NOERROR){
-            //make payload to Cloud
-            result = makeMessageToCloud(pstThingManager, strCategory, strDeviceId, pszPayload, nPayloadLen);
-            ERRIFGOTO(result, _EXIT);
+        //If api key error has occured, goto exit 
+        if(result_save != ERR_CAP_NOERROR){
+            goto _EXIT;
         }
-        */
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+        
+        //ignore error because send variable does not have a return type
+        result = DBHandler_InsertVariable(strDeviceId, (char *)json_object_get_string(pJsonVariable));
     }
     else {
-
-        //ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
+        ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
     }
     result = ERR_CAP_NOERROR;
 
