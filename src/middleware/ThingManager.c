@@ -233,7 +233,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
 
         //If api key error has occured, publish error code then return 
         if(result_save != ERR_CAP_NOERROR){
-            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
+            result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
 
             goto _EXIT;
@@ -246,7 +246,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         //If register error has occured, publish error code then return
         result_save = DBHandler_RegisterDevice(strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
         if(result_save != ERR_CAP_NOERROR){
-            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
+            result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
 
             goto _EXIT;
@@ -269,7 +269,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         
         //If api key error has occured, publish error code then return 
         if(result_save != ERR_CAP_NOERROR){
-            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
+            result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
 
             goto _EXIT;
@@ -282,7 +282,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         //If register error has occured, publish error code then return
         result_save = DBHandler_UnregisterDevice(strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
         if(result_save != ERR_CAP_NOERROR){
-            result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
+            result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
 
             goto _EXIT;
