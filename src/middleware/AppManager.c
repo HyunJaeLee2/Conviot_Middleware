@@ -131,8 +131,62 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     ERRIFGOTO(result, _EXIT);
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
+        json_object* pJsonVariable;
+        cap_string strVariableName = NULL;
+        const char* pszConstVariable = "variable";
+        
+        //If api key error has occured, goto exit 
+        if(result_save != ERR_CAP_NOERROR){
+            goto _EXIT;
+        }
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+        
+        //Get variable name 
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
+        ERRIFGOTO(result, _EXIT);
+
+        //TODO
+        //1. Get Condition List and ECA List
+        //2. Compute Each condition then push it into db
+        //3. Compute each eca if condition is met
+        //4. Actuate function where eca condition is met
+        
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_FUNCTION_RESULT) == TRUE) {
+        json_object* pJsonTemp;
+        cap_string strVariableName = NULL;
+        const char* pszConstEcaId = "eca_id", *pszConstError = "error";
+        int nErrorCode = 0, nEcdId;
+       
+        /*
+        //If api key error has occured, goto exit 
+        if(result_save != ERR_CAP_NOERROR){
+            goto _EXIT;
+        }
+        */
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstEcaId, &pJsonTemp)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+
+        nEcdId = json_object_get_int(pJsonTemp);
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstError, &pJsonTemp)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+        
+        nErrorCode = json_object_get_int(pJsonTemp);
+
+        //Get variable name 
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
+        ERRIFGOTO(result, _EXIT);
+
+        //TODO
+        //1.Insert into applicationhistory of its result
+        
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);

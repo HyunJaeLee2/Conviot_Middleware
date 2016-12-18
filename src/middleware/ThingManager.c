@@ -319,6 +319,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
         json_object* pJsonVariable;
+        cap_string strVariableName = NULL;
         const char* pszConstVariable = "variable";
         
         //If api key error has occured, goto exit 
@@ -330,8 +331,12 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
         
+        //Get variable name 
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
+        ERRIFGOTO(result, _EXIT);
+        
         //ignore error because send variable does not have a return type
-        result = DBHandler_InsertVariable(strDeviceId, (char *)json_object_get_string(pJsonVariable));
+        result = DBHandler_InsertVariableHistory(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
