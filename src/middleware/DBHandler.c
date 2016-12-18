@@ -18,15 +18,22 @@
 #include <json-c/json_object.h>
 
 #define QUERY_SIZE 1024*16
+#define NULL_ERROR -1
 
 static MYSQL *g_pDBconn = NULL;
 
+//TODO
+//Receive MYQL * as an argument, but use g_pDBconn internally.
+//This is because it shows error when it uses pDBconnParam as an argument
+//Check why this happens when it points to same address when checking with gdb 
 static cap_result callQueryWithResult(MYSQL* pDBconnParam, char* query, MYSQL_RES **ppMysqlResult, int *pnRowCount)
 {
     cap_result ret = ERR_CAP_UNKNOWN;
     int nQueryRet = 0;
 
-    nQueryRet = mysql_query(pDBconnParam, query);
+    nQueryRet = mysql_query(g_pDBconn, query);
+
+    //fprintf(stderr, "Mysql connection error : %s, mysql_errno : %d\n", mysql_error(&g_pDBconn), mysql_errno(&g_pDBconn));
     if (nQueryRet != 0) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: callQueryWithResult Error : %d",nQueryRet );
         ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
@@ -53,8 +60,8 @@ static cap_result callQuery(MYSQL* pDBconnParam, char* query)
 {
     cap_result ret = ERR_CAP_UNKNOWN;
     int nQueryRet = 0;
-
-    nQueryRet = mysql_query(pDBconnParam, query);
+    
+    nQueryRet = mysql_query(g_pDBconn, query);
     if (nQueryRet != 0) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: callQuery Error : %d", nQueryRet);
         ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
@@ -85,6 +92,14 @@ _EXIT:
     return result;
 }
 
+static int atoiIgnoreNull(const char* pszMysqlResult){
+    if(pszMysqlResult == NULL){
+        return NULL_ERROR;
+    }
+    else {
+        return atoi(pszMysqlResult);
+    }
+}
 static cap_result checkDeviceWithId(IN cap_string strDeviceId) {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -112,13 +127,15 @@ static cap_result checkDeviceWithId(IN cap_string strDeviceId) {
     }
 
     //if thing is not registered 
-    if(atoi(mysqlRow[0]) == FALSE){
+    if(atoiIgnoreNull(mysqlRow[0]) == FALSE){
         dlp("Thing is not registered to system!\n");
         ERRASSIGNGOTO(result, ERR_CAP_DUPLICATED, _EXIT);
+
     }
     
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
     return result;
 }
 
@@ -143,7 +160,7 @@ cap_result DBHandler_VerifyApiKey(IN cap_string strDeviceId, IN char *pszApiKey)
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 vendor.api_key\
-            FROM\
+           FROM\
                 things_device device,\
                 things_userthing userthing,\
                 things_thing thing,\
@@ -173,6 +190,7 @@ cap_result DBHandler_VerifyApiKey(IN cap_string strDeviceId, IN char *pszApiKey)
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
     return result;
 
 }
@@ -205,7 +223,7 @@ cap_result DBHandler_RegisterDevice(IN cap_string strDeviceId, IN char *pszPinCo
     }
 
     //if thing already has been registered 
-    if(atoi(mysqlRow[0]) == TRUE){
+    if(atoiIgnoreNull(mysqlRow[0]) == TRUE){
         dlp("Thing is already registered!\n");
         ERRASSIGNGOTO(result, ERR_CAP_DUPLICATED, _EXIT);
     }
@@ -223,6 +241,7 @@ cap_result DBHandler_RegisterDevice(IN cap_string strDeviceId, IN char *pszPinCo
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
     return result;
 
 }
@@ -263,23 +282,21 @@ cap_result DBHandler_UpdateLatestTime(IN cap_string strDeviceId) {
     
     result = checkDeviceWithId(strDeviceId);
     ERRIFGOTO(result, _EXIT);
-    //TODO
-    //update latest time of device
-    /*
+    
     snprintf(query, QUERY_SIZE, "\
             UPDATE\
                 things_device device\
             SET\
-                device.is_connected = 0\
+                device.updated_at = now()\
             where\
-                device.pin_code = '%s';", pszPinCode);
-    */
+                device.device_id = '%s';", CAPString_LowPtr(strDeviceId, NULL));
 
     result = callQuery(g_pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
     return result;
 }
 
@@ -289,7 +306,7 @@ cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_str
     MYSQL_RES *pMysqlResult = NULL;
     MYSQL_ROW mysqlRow;
     int nRowCount = 0;
-    int nUserThingId = 0, nCostomerId = 0, nVariableId = 0;
+    int nUserThingId = 0, nCustomerId = 0, nVariableId = 0;
     
     result = checkDeviceWithId(strDeviceId);
     ERRIFGOTO(result, _EXIT);
@@ -306,8 +323,8 @@ cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_str
             WHERE\
                 device.device_id = '%s' and\
                 device.user_thing_id = userthing.id and\
-                variable.name = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
-
+                variable.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
+    
     result = callQueryWithResult(g_pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -319,26 +336,27 @@ cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_str
         ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
     }
     else {
-        nUserThingId = atoi(mysqlRow[0]);
-        nCostomerId = atoi(mysqlRow[1]);
-        nVariableId = atoi(mysqlRow[2]);
+        nUserThingId = atoiIgnoreNull(mysqlRow[0]);
+        nCustomerId = atoiIgnoreNull(mysqlRow[1]);
+        nVariableId = atoiIgnoreNull(mysqlRow[2]);
     }
     
     snprintf(query, QUERY_SIZE, "\
             INSERT INTO\
-                things_variablehistory(customer_id, user_thing_id, variable_id, value)\
-            VALUES(%d, %d, %d, %s);", nUserThingId, nCostomerId, nVariableId, pszVariable);
+                things_variablehistory(created_at, updated_at, customer_id, user_thing_id, variable_id, value)\
+            VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nUserThingId, nVariableId, pszVariable);
 
     result = callQuery(g_pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
     return result;
     //TODO
 }
 
-cap_result DBHandler_InsertApplicationHistory(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable) {
+cap_result DBHandler_InsertApplicationHistory(IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcdId, IN int nErrorCode) {
 
 }
 

@@ -51,6 +51,7 @@ typedef enum _EIoTHandleId {
 #define QOS_LEVEL_2 (2)
 
 #define SAFEJSONFREE(mem) if((mem) != NULL){json_object_put((mem));mem=NULL;}
+#define SAFEMYSQLFREE(mem) if((mem) != NULL){mysql_free_result((mem));mem=NULL;}
 
 extern cap_bool g_bExit;
 extern cap_handle g_hLogger;

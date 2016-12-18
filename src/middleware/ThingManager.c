@@ -210,6 +210,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     //Get Thing ID
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strDeviceId);
     ERRIFGOTO(result, _EXIT);
+   
     
     //Parse Payload to check its api key
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
@@ -315,7 +316,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
 
         //ignore error because alive message does not have a return type
-        result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strDeviceId, NULL));
+        result = DBHandler_UpdateLatestTime(strDeviceId);
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
         json_object* pJsonVariable;
@@ -327,13 +328,14 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             goto _EXIT;
         }
         
-        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
-            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
-        }
-        
         //Get variable name 
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
+        
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
         
         //ignore error because send variable does not have a return type
         result = DBHandler_InsertVariableHistory(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));

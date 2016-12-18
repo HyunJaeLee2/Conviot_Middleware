@@ -13,7 +13,7 @@
 #include <Json_common.h>
 
 #include "AppManager.h"
-//#include "DBHandler.h"
+#include "DBHandler.h"
 #include "MQTTMessageHandler.h"
 
 #define MQTT_CLIENT_ID "Conviot_AppManager"
@@ -22,7 +22,7 @@
 #define MQTT_SUBSCRIPTION_NUM (sizeof(paszAppManagerSubcriptionList) / sizeof(char*))
 
 static char* paszAppManagerSubcriptionList[] = {
-    "TM/SEND_VARIABLE/#",
+   // "TM/SEND_VARIABLE/#",
     "TM/FUNRTION_RESULT/#",
 };
 
@@ -102,12 +102,24 @@ _EXIT:
     return result;
 }
 
+static cap_result handleUserApplication(IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
+        //TODO
+        //1. Get Condition List and ECA List
+        //2. Compute Each condition then push it into db
+        //3. Compute each eca if condition is met
+        //4. Actuate function where eca condition is met
+        
+}
+
 static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_handle hTopicItemList,
         char *pszPayload, int nPayloadLen, IN void *pUserData)
 {
     cap_result result = ERR_CAP_UNKNOWN;
+    cap_result result_save = ERR_CAP_UNKNOWN;
+    json_object* pJsonObject, *pJsonApiKey;
+    const char* pszConstApiKey = "apikey";
     cap_string strCategory = NULL;
-    cap_string strThingId = NULL;
+    cap_string strDeviceId = NULL;
 
     SAppManager* pstAppManager = NULL;
 
@@ -115,9 +127,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
 
     pstAppManager = (SAppManager *) pUserData;
 
-    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
-    ERRIFGOTO(result, _EXIT);
-    
+
     /*Topics are set as follow
      *[TM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
      */
@@ -127,8 +137,24 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     ERRIFGOTO(result, _EXIT);
    
     //Get Thing ID
-    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strThingId);
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strDeviceId);
     ERRIFGOTO(result, _EXIT);
+    
+    //Parse Payload to check its api key
+    result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
+    ERRIFGOTO(result, _EXIT);
+   
+    if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey)) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+
+    //TODO
+    //Add Error code to each specific situation
+
+    //save result to report error later
+    //ERR_CAP_NO_DATA : no matching device
+    //ERR_CAP_INVALID_DATA : api key doesn't match
+    result_save = DBHandler_VerifyApiKey(strDeviceId, (char *)json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
         json_object* pJsonVariable;
@@ -148,16 +174,15 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
 
-        //TODO
-        //1. Get Condition List and ECA List
-        //2. Compute Each condition then push it into db
-        //3. Compute each eca if condition is met
-        //4. Actuate function where eca condition is met
-        
+        /*
+        result = handleUserApplication(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        ERRIFGOTO(result, _EXIT);
+        */
+
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_FUNCTION_RESULT) == TRUE) {
         json_object* pJsonTemp;
-        cap_string strVariableName = NULL;
+        cap_string strFunctionName = NULL;
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
         int nErrorCode = 0, nEcdId;
        
@@ -181,7 +206,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         nErrorCode = json_object_get_int(pJsonTemp);
 
         //Get variable name 
-        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
         //TODO
