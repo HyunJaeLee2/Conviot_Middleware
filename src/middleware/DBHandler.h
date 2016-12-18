@@ -8,6 +8,7 @@
 
 #include "ThingManager.h"
 #include "CentralManager.h"
+#include "AppManager.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,6 +24,7 @@ cap_result DBHandler_UnregisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceI
 cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceId);
 cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable);
 cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcaId, IN int nErrorCode);
+cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList, IN OUT cap_handle hEcaList);
 #ifdef __cplusplus
 }
 #endif

@@ -23,6 +23,16 @@ typedef struct _SAppManager {
     MYSQL *pDBconn;
 } SAppManager;
 
+typedef struct _SConditionContext {
+    cap_string strExpression;
+    int nConditionId;
+    cap_bool bIsSatisfied;
+} SConditionContext;
+
+typedef struct _SEcaContext {
+    int nEcaId;
+    EOperator enOp;
+} SEcaContext;
 
 cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerURI, IN SDBInfo *pstDBInfo);
 cap_result AppManager_Run(cap_handle hAppManager);

@@ -37,6 +37,39 @@ CAPSTRING_CONST(CAPSTR_SCENARIO_RESULT, "MT/REQUEST_FUNCTION/");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, "/");
 CAPSTRING_CONST(CAPSTR_MT, "MT/");
 
+static CALLBACK cap_result destroyEca(int nOffset, void* pData, void* pUsrData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SEcaContext* pstEcaContext = NULL;
+
+    IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstEcaContext = (SEcaContext*)pData;
+
+    SAFEMEMFREE(pstEcaContext);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
+static CALLBACK cap_result destroyRelatedCondtion(int nOffset, void* pData, void* pUsrData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SConditionContext* pstConditionContext = NULL;
+
+    IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstConditionContext = (SConditionContext*)pData;
+
+	SAFE_CAPSTRING_DELETE(pstConditionContext->strExpression);
+    SAFEMEMFREE(pstConditionContext);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
 
 static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppManager, cap_string strClientId,
         cap_string strTopicCategory, cap_string strErrorString)
@@ -102,12 +135,34 @@ _EXIT:
     return result;
 }
 
-static cap_result handleUserApplication(IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
-        //TODO
-        //1. Get Condition List and ECA List
-        //2. Compute Each condition then push it into db
-        //3. Compute each eca if condition is met
-        //4. Actuate function where eca condition is met
+static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_handle hRelatedConditionList = NULL, hEcaList = NULL; 
+
+    result = CAPLinkedList_Create(&hRelatedConditionList);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = CAPLinkedList_Create(&hEcaList);
+    ERRIFGOTO(result, _EXIT);
+
+    result = DBHandler_MakeConditionAndEcaList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList, hEcaList);
+    ERRIFGOTO(result, _EXIT);
+    //TODO
+    //1. Get Condition List and ECA List
+    //2. Compute Each condition then push it into db
+    //3. Compute each eca if condition is met
+    //4. Actuate function where eca condition is met
+
+_EXIT:
+    if(result != ERR_CAP_NOERROR){
+        //nothing 
+    }
+
+    CAPLinkedList_Traverse(hRelatedConditionList, destroyRelatedCondtion, NULL);
+    CAPLinkedList_Traverse(hEcaList, destroyEca, NULL);
+    CAPLinkedList_Destroy(&hRelatedConditionList);
+    CAPLinkedList_Destroy(&hEcaList);
+    return result;
         
 }
 
@@ -174,10 +229,8 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
 
-        /*
-        result = handleUserApplication(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        result = handleUserApplication(pstAppManager, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
         ERRIFGOTO(result, _EXIT);
-        */
 
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_FUNCTION_RESULT) == TRUE) {

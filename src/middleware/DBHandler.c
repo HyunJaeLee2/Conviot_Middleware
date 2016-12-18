@@ -425,8 +425,79 @@ _EXIT:
     return result;
 }
 
+cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string strDeviceId,\
+        IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList, IN OUT cap_handle hEcaList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
 
+    result = checkDeviceWithId(pDBconn, strDeviceId);
+    ERRIFGOTO(result, _EXIT);
+    
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                condition.id,\
+                condition.expression,\
+                eca.id\
+                eca.operator,\
+            FROM\
+                things_device device,\
+                things_userthing userthing,\
+                things_variable variable,\
+                things_condition condition,\
+                things_eventconditionaction eca\
+            WHERE\
+                device.device_id = '%s' and\
+                device.user_thing_id = condition.user_thing_id and\
+                device.user_thing_id = userthing.id and\
+                userthing.customer_id = eca.customer_id and\
+                variable.identifier = '%s' and \
+                variable.id = condition.variable_id;", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
 
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
+    {
+        SConditionContext *pstConditionContext = (SConditionContext*)calloc(1, sizeof(SConditionContext));    
+        SEcaContext *pstEcaContext = (SEcaContext*)calloc(1, sizeof(SEcaContext));    
+    
+        pstConditionContext->strExpression = CAPString_New();
+        ERRMEMGOTO(pstConditionContext->strExpression, result, _EXIT);
+        
+        pstConditionContext->nConditionId = atoiIgnoreNull(mysqlRow[0]);
+
+        result = CAPString_SetLow(pstConditionContext->strExpression, mysqlRow[1] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
+        pstEcaContext->nEcaId = atoiIgnoreNull(mysqlRow[2]);
+
+        if(strncmp(mysqlRow[3], "and", 3) == 0){
+            pstEcaContext->enOp = OPERATOR_AND;
+        }
+        else if(strncmp(mysqlRow[3], "or", 2) == 0){
+            pstEcaContext->enOp = OPERATOR_OR;
+        }
+        else {
+            //Not supported
+            dlp("not supported operator\n");
+        }
+        
+        result = CAPLinkedList_Add(hRelatedConditionList, LINKED_LIST_OFFSET_LAST, 0, pstConditionContext);
+        ERRIFGOTO(result, _EXIT);
+
+        result = CAPLinkedList_Add(hEcaList, LINKED_LIST_OFFSET_LAST, 0, pstEcaContext);
+        ERRIFGOTO(result, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
 
 
 
