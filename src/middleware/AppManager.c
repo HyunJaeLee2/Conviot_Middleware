@@ -23,7 +23,7 @@
 
 static char* paszAppManagerSubcriptionList[] = {
     "TM/SEND_VARIABLE/#",
-    "TM/FUNRTION_RESULT/#",
+    "TM/FUNCTION_RESULT/#",
 };
 
 
@@ -184,7 +184,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         json_object* pJsonTemp;
         cap_string strFunctionName = NULL;
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
-        int nErrorCode = 0, nEcdId;
+        int nErrorCode = 0, nEcdId = 0;
        
         /*
         //If api key error has occured, goto exit 
@@ -209,8 +209,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
-        //TODO
-        //1.Insert into applicationhistory of its result
+        result = DBHandler_InsertApplicationHistory(pstAppManager->pDBconn,strDeviceId, strFunctionName, nEcdId, nErrorCode);
         
     }
     else {

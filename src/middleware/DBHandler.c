@@ -361,9 +361,68 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcdId, IN int nErrorCode)
+cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcaId, IN int nErrorCode)
 {
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    int nCustomerId = 0, nFunctionId = 0;
+    
+    result = checkDeviceWithId(pDBconn, strDeviceId);
+    ERRIFGOTO(result, _EXIT);
 
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                userthing.customer_id,\
+                function.id\
+            FROM\
+                things_device device,\
+                things_userthing userthing,\
+                things_function function\
+            WHERE\
+                device.device_id = '%s' and\
+                device.user_thing_id = userthing.id and\
+                function.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strFunctionName, NULL));
+   
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no matching device with pin code
+    if(mysqlRow == NULL){
+        dlp("There is no matching device!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+    else {
+        nCustomerId = atoiIgnoreNull(mysqlRow[0]);
+        nFunctionId = atoiIgnoreNull(mysqlRow[1]);
+    }
+  
+    //TODO
+    //Added message to database with error code
+    if(nErrorCode == 0) {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_applicationhistory(created_at, updated_at, customer_id, event_condition_action_id, function_id, status)\
+                VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nEcaId, nFunctionId, "success");
+    }
+    else {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_applicationhistory(created_at, updated_at, customer_id, event_condition_action_id, function_id, status)\
+                VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nEcaId, nFunctionId, "failed");
+    }
+
+    result = callQuery(pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
 }
 
 
