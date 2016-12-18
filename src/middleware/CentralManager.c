@@ -55,16 +55,13 @@ cap_result CentralManager_Create(OUT cap_handle *phCentralManager, IN SConfigDat
     result = CAPString_SetLow(strBrokerURI, pstConfigData->pszBrokerURI, CAPSTRING_MAX);
     ERRIFGOTO(result, _EXIT);
 
-    result = DBHandler_OpenDB(pstConfigData->pstDBInfo);
-    ERRIFGOTO(result, _EXIT);
-
-    result = ThingManager_Create(&(pstCentralManager->hThingManager), strBrokerURI);
+    result = ThingManager_Create(&(pstCentralManager->hThingManager), strBrokerURI, pstConfigData->pstDBInfo);
     ERRIFGOTO(result, _EXIT);
    
-    result = AppManager_Create(&(pstCentralManager->hAppManager), strBrokerURI);
+    result = AppManager_Create(&(pstCentralManager->hAppManager), strBrokerURI, pstConfigData->pstDBInfo);
     ERRIFGOTO(result, _EXIT);
 
-    result = InfoManager_Create(&(pstCentralManager->hInfoManager), strBrokerURI);
+    result = InfoManager_Create(&(pstCentralManager->hInfoManager), strBrokerURI, pstConfigData->pstDBInfo);
     ERRIFGOTO(result, _EXIT);
     
     *phCentralManager = pstCentralManager;
@@ -130,8 +127,6 @@ cap_result CentralManager_Destroy(IN OUT cap_handle *phCentralManager) {
     AppManager_Destroy(&(pstCentralManager->hAppManager));
     CAPThreadEvent_Destroy(&hEvent);
    
-    DBHandler_CloseDB();
-
     SAFEMEMFREE(pstCentralManager);
 
     *phCentralManager = NULL;

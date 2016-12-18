@@ -22,7 +22,7 @@
 #define MQTT_SUBSCRIPTION_NUM (sizeof(paszAppManagerSubcriptionList) / sizeof(char*))
 
 static char* paszAppManagerSubcriptionList[] = {
-   // "TM/SEND_VARIABLE/#",
+    "TM/SEND_VARIABLE/#",
     "TM/FUNRTION_RESULT/#",
 };
 
@@ -154,7 +154,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     //save result to report error later
     //ERR_CAP_NO_DATA : no matching device
     //ERR_CAP_INVALID_DATA : api key doesn't match
-    result_save = DBHandler_VerifyApiKey(strDeviceId, (char *)json_object_get_string(pJsonApiKey));
+    result_save = DBHandler_VerifyApiKey(pstAppManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
         json_object* pJsonVariable;
@@ -225,7 +225,7 @@ _EXIT:
     return result;
 }
 
-cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerURI)
+cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerURI, IN SDBInfo *pstDBInfo)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SAppManager* pstAppManager = NULL;
@@ -242,6 +242,9 @@ cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerU
 
     pstAppManager->strBrokerURI = CAPString_New();
     ERRMEMGOTO(pstAppManager->strBrokerURI, result, _EXIT);
+    
+    result = DBHandler_OpenDB(pstDBInfo, &pstAppManager->pDBconn);
+    ERRIFGOTO(result, _EXIT);
 
     result = CAPString_Set(pstAppManager->strBrokerURI, strBrokerURI);
     ERRIFGOTO(result, _EXIT);
@@ -255,7 +258,6 @@ cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerU
     result = ERR_CAP_NOERROR;
 _EXIT:
     if (result != ERR_CAP_NOERROR) {
-        //Destroy lock before deallocating pstThingMgmr
         if(pstAppManager != NULL){
             SAFE_CAPSTRING_DELETE(pstAppManager->strBrokerURI);
         }
@@ -309,6 +311,9 @@ cap_result AppManager_Join(IN cap_handle hAppManager)
 
     if (pstAppManager->bCreated == TRUE) {
         result = MQTTMessageHandler_Disconnect(pstAppManager->hMQTTHandler);
+        ERRIFGOTO(result, _EXIT);
+
+        result = DBHandler_CloseDB(pstAppManager->pDBconn);
         ERRIFGOTO(result, _EXIT);
     }
 

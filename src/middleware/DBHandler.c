@@ -2,7 +2,6 @@
 #ifdef HAVE_CONFIG_H
 #endif
 
-#include <mysql.h>
 #include <errno.h>
 
 #include <CAPLinkedList.h>
@@ -20,20 +19,18 @@
 #define QUERY_SIZE 1024*16
 #define NULL_ERROR -1
 
-static MYSQL *g_pDBconn = NULL;
-
 //TODO
 //Receive MYQL * as an argument, but use g_pDBconn internally.
 //This is because it shows error when it uses pDBconnParam as an argument
 //Check why this happens when it points to same address when checking with gdb 
-static cap_result callQueryWithResult(MYSQL* pDBconnParam, char* query, MYSQL_RES **ppMysqlResult, int *pnRowCount)
+static cap_result callQueryWithResult(MYSQL* pDBconn, char* query, MYSQL_RES **ppMysqlResult, int *pnRowCount)
 {
     cap_result ret = ERR_CAP_UNKNOWN;
     int nQueryRet = 0;
 
-    nQueryRet = mysql_query(g_pDBconn, query);
+    nQueryRet = mysql_query(pDBconn, query);
 
-    //fprintf(stderr, "Mysql connection error : %s, mysql_errno : %d\n", mysql_error(&g_pDBconn), mysql_errno(&g_pDBconn));
+    //fprintf(stderr, "Mysql connection error : %s, mysql_errno : %d\n", mysql_error(&pDBconn), mysql_errno(&pDBconn));
     if (nQueryRet != 0) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: callQueryWithResult Error : %d",nQueryRet );
         ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
@@ -43,7 +40,7 @@ static cap_result callQueryWithResult(MYSQL* pDBconnParam, char* query, MYSQL_RE
      * MysqlResult has to be freed from where it is called
      */
 
-    *ppMysqlResult = mysql_store_result(g_pDBconn);
+    *ppMysqlResult = mysql_store_result(pDBconn);
     if(*ppMysqlResult == NULL) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: Result Store Error : %d", nQueryRet);
         ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
@@ -56,12 +53,12 @@ _EXIT:
     return ret;
 }
 
-static cap_result callQuery(MYSQL* pDBconnParam, char* query)
+static cap_result callQuery(MYSQL* pDBconn, char* query)
 {
     cap_result ret = ERR_CAP_UNKNOWN;
     int nQueryRet = 0;
     
-    nQueryRet = mysql_query(g_pDBconn, query);
+    nQueryRet = mysql_query(pDBconn, query);
     if (nQueryRet != 0) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: callQuery Error : %d", nQueryRet);
         ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
@@ -72,20 +69,23 @@ _EXIT:
     return ret;
 }
 
-cap_result DBHandler_OpenDB(SDBInfo *pstDBInfo)
+cap_result DBHandler_OpenDB(IN SDBInfo *pstDBInfo, OUT MYSQL **ppDBconn)
 {
     cap_result result = ERR_CAP_UNKNOWN;
+    MYSQL *pDBconn = NULL;
 
-    g_pDBconn = mysql_init(NULL);
-    if(g_pDBconn == NULL){
+    pDBconn = mysql_init(NULL);
+    if(pDBconn == NULL){
         ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
     }
 
-    if(mysql_real_connect(g_pDBconn, pstDBInfo->pszDBHost, pstDBInfo->pszDBUser,\
+    if(mysql_real_connect(pDBconn, pstDBInfo->pszDBHost, pstDBInfo->pszDBUser,\
                 pstDBInfo->pszDBPassword, pstDBInfo->pszDBName, pstDBInfo->nDBPort, NULL, 0) == NULL) {
         ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
     }   
-    
+   
+    *ppDBconn = pDBconn;
+
     result = ERR_CAP_NOERROR;
 
 _EXIT:
@@ -100,7 +100,8 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
         return atoi(pszMysqlResult);
     }
 }
-static cap_result checkDeviceWithId(IN cap_string strDeviceId) {
+
+static cap_result checkDeviceWithId(IN MYSQL *pDBconn,IN cap_string strDeviceId) {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
@@ -115,7 +116,7 @@ static cap_result checkDeviceWithId(IN cap_string strDeviceId) {
             WHERE\
                 device.device_id = '%s';", CAPString_LowPtr(strDeviceId, NULL));
 
-    result = callQueryWithResult(g_pDBconn, query, &pMysqlResult, &nRowCount);
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
     mysqlRow = mysql_fetch_row(pMysqlResult);
@@ -139,17 +140,18 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_CloseDB()
+cap_result DBHandler_CloseDB(MYSQL *pDBconn)
 {
     cap_result result = ERR_CAP_UNKNOWN;
 
-    mysql_close(g_pDBconn);
+    mysql_close(pDBconn);
 
     result = ERR_CAP_NOERROR;
     return result;
 }
 
-cap_result DBHandler_VerifyApiKey(IN cap_string strDeviceId, IN char *pszApiKey){
+cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszApiKey)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
@@ -163,15 +165,15 @@ cap_result DBHandler_VerifyApiKey(IN cap_string strDeviceId, IN char *pszApiKey)
            FROM\
                 things_device device,\
                 things_userthing userthing,\
-                things_thing thing,\
+                things_product product,\
                 things_vendor vendor\
             WHERE\
                 device.device_id = '%s' and\
                 device.user_thing_id = userthing.id and\
-                userthing.thing_id = thing.id and\
-                thing.vendor_id = vendor.id;", CAPString_LowPtr(strDeviceId, NULL));
+                userthing.product_id = product.id and\
+                product.vendor_id = vendor.id;", CAPString_LowPtr(strDeviceId, NULL));
 
-    result = callQueryWithResult(g_pDBconn, query, &pMysqlResult, &nRowCount);
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
     mysqlRow = mysql_fetch_row(pMysqlResult);
@@ -195,7 +197,8 @@ _EXIT:
 
 }
 
-cap_result DBHandler_RegisterDevice(IN cap_string strDeviceId, IN char *pszPinCode){
+cap_result DBHandler_RegisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN char *pszPinCode)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
@@ -211,7 +214,7 @@ cap_result DBHandler_RegisterDevice(IN cap_string strDeviceId, IN char *pszPinCo
             WHERE\
                 device.pin_code = '%s';", pszPinCode);
 
-    result = callQueryWithResult(g_pDBconn, query, &pMysqlResult, &nRowCount);
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
     mysqlRow = mysql_fetch_row(pMysqlResult);
@@ -236,7 +239,7 @@ cap_result DBHandler_RegisterDevice(IN cap_string strDeviceId, IN char *pszPinCo
             where\
                 device.pin_code = '%s';", pszPinCode);
 
-    result = callQuery(g_pDBconn, query);
+    result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
@@ -246,14 +249,15 @@ _EXIT:
 
 }
 
-cap_result DBHandler_UnregisterDevice(IN cap_string strDeviceId, IN char *pszPinCode){
+cap_result DBHandler_UnregisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN char *pszPinCode)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
     MYSQL_ROW mysqlRow;
     int nRowCount = 0;
     
-    result = checkDeviceWithId(strDeviceId);
+    result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
 
     snprintf(query, QUERY_SIZE, "\
@@ -264,7 +268,7 @@ cap_result DBHandler_UnregisterDevice(IN cap_string strDeviceId, IN char *pszPin
             where\
                 device.pin_code = '%s';", pszPinCode);
 
-    result = callQuery(g_pDBconn, query);
+    result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
@@ -273,14 +277,15 @@ _EXIT:
 
 }
 
-cap_result DBHandler_UpdateLatestTime(IN cap_string strDeviceId) {
+cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceId)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
     MYSQL_ROW mysqlRow;
     int nRowCount = 0;
     
-    result = checkDeviceWithId(strDeviceId);
+    result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
     
     snprintf(query, QUERY_SIZE, "\
@@ -291,7 +296,7 @@ cap_result DBHandler_UpdateLatestTime(IN cap_string strDeviceId) {
             where\
                 device.device_id = '%s';", CAPString_LowPtr(strDeviceId, NULL));
 
-    result = callQuery(g_pDBconn, query);
+    result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
@@ -300,7 +305,8 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable) {
+cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable)
+{
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
@@ -308,7 +314,7 @@ cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_str
     int nRowCount = 0;
     int nUserThingId = 0, nCustomerId = 0, nVariableId = 0;
     
-    result = checkDeviceWithId(strDeviceId);
+    result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
 
     snprintf(query, QUERY_SIZE, "\
@@ -325,7 +331,7 @@ cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_str
                 device.user_thing_id = userthing.id and\
                 variable.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
     
-    result = callQueryWithResult(g_pDBconn, query, &pMysqlResult, &nRowCount);
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
     mysqlRow = mysql_fetch_row(pMysqlResult);
@@ -346,17 +352,17 @@ cap_result DBHandler_InsertVariableHistory(IN cap_string strDeviceId, IN cap_str
                 things_variablehistory(created_at, updated_at, customer_id, user_thing_id, variable_id, value)\
             VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nUserThingId, nVariableId, pszVariable);
 
-    result = callQuery(g_pDBconn, query);
+    result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
 _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
     return result;
-    //TODO
 }
 
-cap_result DBHandler_InsertApplicationHistory(IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcdId, IN int nErrorCode) {
+cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcdId, IN int nErrorCode)
+{
 
 }
 

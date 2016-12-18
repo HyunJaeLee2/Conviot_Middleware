@@ -226,7 +226,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     //save result to report error later
     //ERR_CAP_NO_DATA : no matching device
     //ERR_CAP_INVALID_DATA : api key doesn't match
-    result_save = DBHandler_VerifyApiKey(strDeviceId, (char *)json_object_get_string(pJsonApiKey));
+    result_save = DBHandler_VerifyApiKey(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_REGISTER) == TRUE) {
         json_object* pJsonPinCode;
@@ -245,7 +245,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
 
         //If register error has occured, publish error code then return
-        result_save = DBHandler_RegisterDevice(strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
+        result_save = DBHandler_RegisterDevice(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
         if(result_save != ERR_CAP_NOERROR){
             result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
@@ -281,7 +281,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
 
         //If register error has occured, publish error code then return
-        result_save = DBHandler_UnregisterDevice(strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
+        result_save = DBHandler_UnregisterDevice(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
         if(result_save != ERR_CAP_NOERROR){
             result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
             ERRIFGOTO(result, _EXIT);
@@ -316,7 +316,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
 
         //ignore error because alive message does not have a return type
-        result = DBHandler_UpdateLatestTime(strDeviceId);
+        result = DBHandler_UpdateLatestTime(pstThingManager->pDBconn, strDeviceId);
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
         json_object* pJsonVariable;
@@ -338,7 +338,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
         
         //ignore error because send variable does not have a return type
-        result = DBHandler_InsertVariableHistory(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        result = DBHandler_InsertVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
@@ -354,7 +354,7 @@ _EXIT:
 }
 
 
-cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string strBrokerURI)
+cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string strBrokerURI, IN SDBInfo *pstDBInfo)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
@@ -371,6 +371,9 @@ cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string str
     pstThingManager->hMQTTHandler = NULL;
     pstThingManager->nAliveCheckingPeriod = 0;
     
+    result = DBHandler_OpenDB(pstDBInfo, &pstThingManager->pDBconn);
+    ERRIFGOTO(result, _EXIT);
+
     //create event for timedwait
     result = CAPThreadEvent_Create(&pstThingManager->hEvent);
     ERRIFGOTO(result, _EXIT);
@@ -452,6 +455,9 @@ cap_result ThingManager_Join(IN cap_handle hThingManager)
         result = MQTTMessageHandler_Disconnect(pstThingManager->hMQTTHandler);
         ERRIFGOTO(result, _EXIT);
 
+        result = DBHandler_CloseDB(pstThingManager->pDBconn);
+        ERRIFGOTO(result, _EXIT);
+        
         pstThingManager->bCreated = FALSE;
     }
 

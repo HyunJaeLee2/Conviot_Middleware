@@ -67,7 +67,7 @@ _EXIT:
     return result;
 }
 
-cap_result InfoManager_Create(OUT cap_handle* phInfoManager, IN cap_string strBrokerURI)
+cap_result InfoManager_Create(OUT cap_handle* phInfoManager, IN cap_string strBrokerURI, IN SDBInfo *pstDBInfo)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SInfoManager* pstInfoManager = NULL;
@@ -82,6 +82,9 @@ cap_result InfoManager_Create(OUT cap_handle* phInfoManager, IN cap_string strBr
     pstInfoManager->enID = HANDLEID_INFO_MANAGER;
     pstInfoManager->bCreated = FALSE;
     pstInfoManager->hMQTTHandler = NULL;
+    
+    result = DBHandler_OpenDB(pstDBInfo, &pstInfoManager->pDBconn);
+    ERRIFGOTO(result, _EXIT);
     
     result = MQTTMessageHandler_Create(strBrokerURI, CAPSTR_MQTT_CLIENT_ID, 0, &(pstInfoManager->hMQTTHandler));
     ERRIFGOTO(result, _EXIT);
@@ -144,6 +147,9 @@ cap_result InfoManager_Join(IN cap_handle hInfoManager)
 
     if (pstInfoManager->bCreated == TRUE) {
         result = MQTTMessageHandler_Disconnect(pstInfoManager->hMQTTHandler);
+        ERRIFGOTO(result, _EXIT);
+        
+        result = DBHandler_CloseDB(pstInfoManager->pDBconn);
         ERRIFGOTO(result, _EXIT);
 
         pstInfoManager->bCreated = FALSE;

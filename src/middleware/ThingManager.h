@@ -3,9 +3,11 @@
 
 #include <MQTTClient.h>
 #include <MQTT_common.h>
+#include <mysql.h>
 
 #include "capiot_common.h"
 #include "CAPThread.h"
+#include "CentralManager.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -29,10 +31,10 @@ typedef struct _SThingManager {
     cap_handle hEvent;
     SThingAliveInfo *pstThingAliveInfoArray;
     int nAliveCheckingPeriod;
+    MYSQL *pDBconn;
 } SThingManager;
 
-
-cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string strBrokerURI);
+cap_result ThingManager_Create(OUT cap_handle* phThingManager, IN cap_string strBrokerURI, IN SDBInfo *pstDBInfo);
 cap_result ThingManager_Run(IN cap_handle hThingManager, IN int nAliveCheckingPeriod);
 cap_result ThingManager_Join(IN cap_handle hThingManager);
 cap_result ThingManager_Destroy(IN OUT cap_handle* phThingManager);
