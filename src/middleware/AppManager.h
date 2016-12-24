@@ -24,8 +24,9 @@ typedef struct _SAppManager {
 } SAppManager;
 
 typedef struct _SConditionContext {
-    cap_string strExpression;
+    cap_string strExpression;	
     int nConditionId;
+    cap_bool bIsSingleCondition;
     cap_bool bIsSatisfied;
     EType enType;
 } SConditionContext;

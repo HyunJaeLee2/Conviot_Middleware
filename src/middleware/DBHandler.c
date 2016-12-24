@@ -438,7 +438,8 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
                 cond.expression,\
                 eca.id,\
                 eca.operator,\
-                variable.type\
+                variable.type,\
+    			(SELECT count(*) FROM things_condition cond WHERE cond.event_condition_action_id = eca.id) as cnt\
             FROM\
                 things_device device,\
                 things_userthing userthing,\
@@ -453,7 +454,7 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
                 cond.user_thing_id = device.user_thing_id and\
                 cond.variable_id = variable.id and\
                 cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
-    
+
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -503,6 +504,14 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
         else {
             //Not supported
             dlp("not supported type\n");
+        }
+
+        //check if there is only one condition in eca
+        if(strncmp(mysqlRow[5], "1", 1) == 0){
+            pstConditionContext->bIsSingleCondition = TRUE;
+        }
+        else {
+            pstConditionContext->bIsSingleCondition = FALSE;
         }
         
         result = CAPLinkedList_Add(hRelatedConditionList, LINKED_LIST_OFFSET_LAST, 0, pstConditionContext);

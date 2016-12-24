@@ -374,9 +374,10 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     result = computeRelatedConditionList(hRelatedConditionList, pszVariable);
     ERRIFGOTO(result, _EXIT);
 
-    //3.Then push it into db
-    //3. Compute each eca if condition is met
-    //4. Actuate function where eca condition is met
+    //3. if there is only one condition, publish action
+    //4 push is_satisfied of each condition into db
+    //5. Compute each eca if condition is met(only if there is more than one condition)
+    //6. Actuate function where eca condition is met
 
 _EXIT:
     if(result != ERR_CAP_NOERROR){
