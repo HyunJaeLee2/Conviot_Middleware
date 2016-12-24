@@ -169,9 +169,9 @@ cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, 
                 things_vendor vendor\
             WHERE\
                 device.device_id = '%s' and\
-                device.user_thing_id = userthing.id and\
-                userthing.product_id = product.id and\
-                product.vendor_id = vendor.id;", CAPString_LowPtr(strDeviceId, NULL));
+                userthing.id = device.user_thing_id and\
+                product.id = device.user_thing_id and\
+                vendor.id = product.vendor_id;", CAPString_LowPtr(strDeviceId, NULL));
 
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
@@ -328,7 +328,7 @@ cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDe
                 things_variable variable\
             WHERE\
                 device.device_id = '%s' and\
-                device.user_thing_id = userthing.id and\
+                userthing.id = device.user_thing_id and\
                 variable.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
     
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
@@ -383,7 +383,7 @@ cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string st
                 things_function function\
             WHERE\
                 device.device_id = '%s' and\
-                device.user_thing_id = userthing.id and\
+                userthing.id = device.user_thing_id and\
                 function.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strFunctionName, NULL));
    
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
@@ -439,24 +439,26 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
     
     snprintf(query, QUERY_SIZE, "\
             SELECT\
-                condition.id,\
-                condition.expression,\
-                eca.id\
-                eca.operator,\
+                cond.id,\
+                cond.expression,\
+                eca.id,\
+                eca.operator\
             FROM\
                 things_device device,\
                 things_userthing userthing,\
                 things_variable variable,\
-                things_condition condition,\
+                things_condition cond,\
                 things_eventconditionaction eca\
             WHERE\
                 device.device_id = '%s' and\
-                device.user_thing_id = condition.user_thing_id and\
-                device.user_thing_id = userthing.id and\
-                userthing.customer_id = eca.customer_id and\
                 variable.identifier = '%s' and \
-                variable.id = condition.variable_id;", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
+                userthing.id = device.user_thing_id and\
+                eca.customer_id = userthing.customer_id  and\
+                cond.user_thing_id = device.user_thing_id and\
+                cond.variable_id = variable.id and \
+                cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
 
+    dlp("query : %s\n " , query);
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 

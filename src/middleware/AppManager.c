@@ -145,10 +145,11 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     result = CAPLinkedList_Create(&hEcaList);
     ERRIFGOTO(result, _EXIT);
 
+    //1. Get Condition List and ECA List
     result = DBHandler_MakeConditionAndEcaList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList, hEcaList);
     ERRIFGOTO(result, _EXIT);
+    
     //TODO
-    //1. Get Condition List and ECA List
     //2. Compute Each condition then push it into db
     //3. Compute each eca if condition is met
     //4. Actuate function where eca condition is met
