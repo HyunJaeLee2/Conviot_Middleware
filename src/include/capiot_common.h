@@ -34,6 +34,15 @@ typedef enum _EOperator {
     NUM_OF_OPERATOR,
 } EOperator;
 
+typedef enum _EType {
+    TYPE_INTEGER,
+    TYPE_DOUBLE,
+    TYPE_STRING,
+    TYPE_BINARY,
+    TYPE_SELECT,
+    NUM_OF_TYPE,
+} EType;
+
 #define HANDLID_GROUP_MIDDLEWARE (0x1000)
 
 typedef enum _EIoTHandleId {

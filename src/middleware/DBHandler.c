@@ -253,9 +253,6 @@ cap_result DBHandler_UnregisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceI
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
-    MYSQL_RES *pMysqlResult = NULL;
-    MYSQL_ROW mysqlRow;
-    int nRowCount = 0;
     
     result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
@@ -282,8 +279,6 @@ cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceI
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
     MYSQL_RES *pMysqlResult = NULL;
-    MYSQL_ROW mysqlRow;
-    int nRowCount = 0;
     
     result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
@@ -436,13 +431,14 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
 
     result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
-    
+   
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 cond.id,\
                 cond.expression,\
                 eca.id,\
-                eca.operator\
+                eca.operator,\
+                variable.type\
             FROM\
                 things_device device,\
                 things_userthing userthing,\
@@ -455,10 +451,9 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
                 userthing.id = device.user_thing_id and\
                 eca.customer_id = userthing.customer_id  and\
                 cond.user_thing_id = device.user_thing_id and\
-                cond.variable_id = variable.id and \
+                cond.variable_id = variable.id and\
                 cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
-
-    dlp("query : %s\n " , query);
+    
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -477,6 +472,7 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
 
         pstEcaContext->nEcaId = atoiIgnoreNull(mysqlRow[2]);
 
+        //check operator
         if(strncmp(mysqlRow[3], "and", 3) == 0){
             pstEcaContext->enOp = OPERATOR_AND;
         }
@@ -486,6 +482,27 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
         else {
             //Not supported
             dlp("not supported operator\n");
+        }
+       
+        //check type 
+        if(strncmp(mysqlRow[4], "integer", 7) == 0){
+            pstConditionContext->enType = TYPE_INTEGER;
+        }
+        else if(strncmp(mysqlRow[4], "double", 6) == 0){
+            pstConditionContext->enType = TYPE_DOUBLE;
+        }
+        else if(strncmp(mysqlRow[4], "binary", 6) == 0){
+            pstConditionContext->enType = TYPE_BINARY;
+        }
+        else if(strncmp(mysqlRow[4], "string", 6) == 0){
+            pstConditionContext->enType = TYPE_STRING;
+        }
+        else if(strncmp(mysqlRow[4], "select", 6) == 0){
+            pstConditionContext->enType = TYPE_SELECT;
+        }
+        else {
+            //Not supported
+            dlp("not supported type\n");
         }
         
         result = CAPLinkedList_Add(hRelatedConditionList, LINKED_LIST_OFFSET_LAST, 0, pstConditionContext);

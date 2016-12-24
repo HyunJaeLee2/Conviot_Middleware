@@ -27,6 +27,7 @@ typedef struct _SConditionContext {
     cap_string strExpression;
     int nConditionId;
     cap_bool bIsSatisfied;
+    EType enType;
 } SConditionContext;
 
 typedef struct _SEcaContext {
