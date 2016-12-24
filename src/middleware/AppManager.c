@@ -71,15 +71,7 @@ _EXIT:
 }
 
 static EOperator convertStringOperatorToEnum(char *pszOperator, int nOperatorIndex){
-    if(strncmp(pszOperator, "<", 1) == 0){
-        if(nOperatorIndex == 1){
-            return OPERATOR_GREATER;
-        }
-        else {
-            return OPERATOR_LESS;
-        }
-    }
-    else if(strncmp(pszOperator, "<=", 1) == 0){
+    if(strncmp(pszOperator, "<=", 2) == 0){
         if(nOperatorIndex == 1){
             return OPERATOR_GREATER_EQUAL;
         }
@@ -87,18 +79,26 @@ static EOperator convertStringOperatorToEnum(char *pszOperator, int nOperatorInd
             return OPERATOR_LESS_EQUAL;
         }
     }
-    else if(strncmp(pszOperator, ">", 1) == 0){
+    else if(strncmp(pszOperator, "<", 1) == 0){
         if(nOperatorIndex == 1){
+            return OPERATOR_GREATER;
+        }
+        else {
             return OPERATOR_LESS;
+        }
+    }
+    else if(strncmp(pszOperator, ">=", 2) == 0){
+        if(nOperatorIndex == 1){
+            return OPERATOR_LESS_EQUAL;
         }
         else {
             //Not supported
             return OPERATOR_NONE;
         }
     }
-    else if(strncmp(pszOperator, "<", 1) == 0){
+    else if(strncmp(pszOperator, ">", 1) == 0){
         if(nOperatorIndex == 1){
-            return OPERATOR_LESS_EQUAL;
+            return OPERATOR_LESS;
         }
         else {
             //Not supported
@@ -139,7 +139,7 @@ static cap_result checkDoubleCondition(double dbVariable, EOperator enOperator, 
     } 
 
     *pbIsSatisfied = bIsSatisfied;
-
+    
     result = ERR_CAP_NOERROR;
 _EXIT:
     return result;
@@ -257,6 +257,7 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
         dlp("not supported type for condition!\n");
     }
 
+    dlp("is satisfied : %d\n", bIsSatisfied);
     pstConditionContext->bIsSatisfied = bIsSatisfied;
 
     result = ERR_CAP_NOERROR;
