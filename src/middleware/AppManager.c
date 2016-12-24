@@ -70,6 +70,226 @@ _EXIT:
     return result;
 }
 
+static EOperator convertStringOperatorToEnum(char *pszOperator, int nOperatorIndex){
+    if(strncmp(pszOperator, "<", 1) == 0){
+        if(nOperatorIndex == 1){
+            return OPERATOR_GREATER;
+        }
+        else {
+            return OPERATOR_LESS;
+        }
+    }
+    else if(strncmp(pszOperator, "<=", 1) == 0){
+        if(nOperatorIndex == 1){
+            return OPERATOR_GREATER_EQUAL;
+        }
+        else {
+            return OPERATOR_LESS_EQUAL;
+        }
+    }
+    else if(strncmp(pszOperator, ">", 1) == 0){
+        if(nOperatorIndex == 1){
+            return OPERATOR_LESS;
+        }
+        else {
+            //Not supported
+            return OPERATOR_NONE;
+        }
+    }
+    else if(strncmp(pszOperator, "<", 1) == 0){
+        if(nOperatorIndex == 1){
+            return OPERATOR_LESS_EQUAL;
+        }
+        else {
+            //Not supported
+            return OPERATOR_NONE;
+        }
+    }
+    else if(strncmp(pszOperator, "isEqual", 7) == 0){
+        return OPERATOR_STRING_IS_EQUAL;
+    }
+    else if(strncmp(pszOperator, "contains", 8) == 0){
+        return OPERATOR_STRING_CONTAINS;
+    }
+    else {
+        return OPERATOR_NONE;
+    }
+}
+
+static cap_result checkDoubleCondition(double dbVariable, EOperator enOperator, double dbOperand, cap_bool *pbIsSatisfied) {
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_bool bIsSatisfied = FALSE;
+
+    switch (enOperator) {
+        case OPERATOR_GREATER:
+            bIsSatisfied = DOUBLE_IS_GREATER(dbVariable, dbOperand);
+            break;
+        case OPERATOR_LESS:
+            bIsSatisfied = DOUBLE_IS_LESS(dbVariable, dbOperand);
+            break;
+        case OPERATOR_GREATER_EQUAL:
+            bIsSatisfied = (DOUBLE_IS_APPROX_EQUAL(dbVariable, dbOperand)) || (DOUBLE_IS_GREATER(dbVariable, dbOperand));
+            break;
+        case OPERATOR_LESS_EQUAL:
+            bIsSatisfied = (DOUBLE_IS_APPROX_EQUAL(dbVariable, dbOperand)) || (DOUBLE_IS_LESS(dbVariable, dbOperand));
+            break;
+        default:
+            dlp("not supported operator for double condition!\n");
+            bIsSatisfied = FALSE;
+    } 
+
+    *pbIsSatisfied = bIsSatisfied;
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
+static cap_result computeSingleCondition(SConditionContext* pstConditionContext, char *pszVariable) {
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_bool bIsSatisfied = FALSE;
+    char *pszExpression = NULL;
+    char *pszToken, *pszPtr = NULL;
+    int nTokenCount = 0;
+
+    IFVARERRASSIGNGOTO(pstConditionContext, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+    
+    pszExpression = CAPString_LowPtr(pstConditionContext->strExpression, NULL); 
+
+    if(pstConditionContext->enType == TYPE_INTEGER || pstConditionContext->enType == TYPE_DOUBLE) {
+        //case 1 : [operand1][space][operator1][space]"value"
+        //case 2 : [operand1][space][operator1][space]"value"[space][operator2][space][operand2]
+        double dbOperand1, dbOperand2;
+        EOperator enOperator1, enOperator2;
+
+        double dbVariable = atof(pszVariable);
+
+        //First Token -> operand1
+        if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
+            dbOperand1 = atof(pszToken);
+            nTokenCount++;
+        }
+
+        //Second Token -> operator1
+        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+            enOperator1 = convertStringOperatorToEnum(pszToken, 1);
+            nTokenCount++;
+        }
+
+        //Third Token -> dummy
+        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+            nTokenCount++;
+        }
+
+        //Fourth Token -> operator2
+        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+            enOperator2 = convertStringOperatorToEnum(pszToken, 2);
+            nTokenCount++;
+        }
+
+        //Fifth Token -> operand2
+        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+            dbOperand2 = atof(pszToken);
+            nTokenCount++;
+        }
+
+        //case 1
+        if(nTokenCount == 3) {
+            result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied);
+            ERRIFGOTO(result, _EXIT);
+        }
+        //case 2
+        else if(nTokenCount == 5){
+            cap_bool bIsSatisfied1 = FALSE;
+            cap_bool bIsSatisfied2 = FALSE;
+            
+            result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied1);
+            ERRIFGOTO(result, _EXIT);
+            
+            result = checkDoubleCondition(dbVariable, enOperator2, dbOperand2, &bIsSatisfied2);
+            ERRIFGOTO(result, _EXIT);
+
+            bIsSatisfied = (bIsSatisfied1 && bIsSatisfied2);
+        } 
+        else {
+            dlp("nTokenCount error!\n");
+        }
+    }
+    else if(pstConditionContext->enType == TYPE_STRING || pstConditionContext->enType == TYPE_SELECT) {
+        //case 1 : "value"[space][operator][space][operand]
+        char *pszOperand = NULL;
+        EOperator enOperator;
+
+        //First Token -> dummy 
+        if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
+            nTokenCount++;
+        }
+
+        //Second Token -> operator
+        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+            enOperator = convertStringOperatorToEnum(pszToken, 1);
+            nTokenCount++;
+        }
+
+        //Third Token -> operand 
+        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+            pszOperand = strdup(pszToken);
+            nTokenCount++;
+        }
+
+        if(enOperator == OPERATOR_STRING_IS_EQUAL){
+            //strcmp returns 0 when two strings are equal
+            bIsSatisfied = !(strcmp(pszOperand, pszVariable));
+        }
+        else if(enOperator == OPERATOR_STRING_CONTAINS) {
+            char *pszResult = strstr(pszVariable, pszOperand);
+            if(pszResult != NULL) {
+                bIsSatisfied = TRUE;
+            }
+            else {
+                bIsSatisfied = FALSE;
+            }
+        }
+        SAFEMEMFREE(pszOperand);
+    }
+    else {
+        //binary type is not available for condition
+        dlp("not supported type for condition!\n");
+    }
+
+    pstConditionContext->bIsSatisfied = bIsSatisfied;
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
+static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, char *pszVariable)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SConditionContext* pstConditionContext = NULL;
+    int nLength = 0;
+    int nLoop = 0;
+
+    IFVARERRASSIGNGOTO(hRelatedConditionList, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    result = CAPLinkedList_GetLength(hRelatedConditionList, &nLength);
+    ERRIFGOTO(result, _EXIT);
+
+    for(nLoop = 0; nLoop < nLength; nLoop++){
+        result = CAPLinkedList_Get(hRelatedConditionList, LINKED_LIST_OFFSET_FIRST, nLoop, (void**)&pstConditionContext);
+        ERRIFGOTO(result, _EXIT);
+
+        result = computeSingleCondition(pstConditionContext, pszVariable);
+        ERRIFGOTO(result, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+
+}
+
 
 static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppManager, cap_string strClientId,
         cap_string strTopicCategory, cap_string strErrorString)
@@ -81,7 +301,7 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     int nPayloadLen = 0;
     EMqttErrorCode enError;
     json_object* pJsonObject;
-    
+
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
     IFVARERRASSIGNGOTO(strClientId, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
     IFVARERRASSIGNGOTO(strErrorString, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
@@ -141,16 +361,19 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
 
     result = CAPLinkedList_Create(&hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
-    
+
     result = CAPLinkedList_Create(&hEcaList);
     ERRIFGOTO(result, _EXIT);
 
     //1. Get Condition List and ECA List
     result = DBHandler_MakeConditionAndEcaList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList, hEcaList);
     ERRIFGOTO(result, _EXIT);
-    
-    //TODO
-    //2. Compute Each condition then push it into db
+
+    //2. Compute Each condition 
+    result = computeRelatedConditionList(hRelatedConditionList, pszVariable);
+    ERRIFGOTO(result, _EXIT);
+
+    //3.Then push it into db
     //3. Compute each eca if condition is met
     //4. Actuate function where eca condition is met
 
@@ -164,7 +387,7 @@ _EXIT:
     CAPLinkedList_Destroy(&hRelatedConditionList);
     CAPLinkedList_Destroy(&hEcaList);
     return result;
-        
+
 }
 
 static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_handle hTopicItemList,
@@ -191,15 +414,15 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     //Get Category
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
     ERRIFGOTO(result, _EXIT);
-   
+
     //Get Thing ID
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strDeviceId);
     ERRIFGOTO(result, _EXIT);
-    
+
     //Parse Payload to check its api key
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
     ERRIFGOTO(result, _EXIT);
-   
+
     if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey)) {
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }
@@ -216,16 +439,16 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         json_object* pJsonVariable;
         cap_string strVariableName = NULL;
         const char* pszConstVariable = "variable";
-        
+
         //If api key error has occured, goto exit 
         if(result_save != ERR_CAP_NOERROR){
             goto _EXIT;
         }
-        
+
         if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
-        
+
         //Get variable name 
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
@@ -239,24 +462,24 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         cap_string strFunctionName = NULL;
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
         int nErrorCode = 0, nEcdId = 0;
-       
+
         /*
         //If api key error has occured, goto exit 
         if(result_save != ERR_CAP_NOERROR){
-            goto _EXIT;
+        goto _EXIT;
         }
         */
-        
+
         if (!json_object_object_get_ex(pJsonObject, pszConstEcaId, &pJsonTemp)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
 
         nEcdId = json_object_get_int(pJsonTemp);
-        
+
         if (!json_object_object_get_ex(pJsonObject, pszConstError, &pJsonTemp)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
-        
+
         nErrorCode = json_object_get_int(pJsonTemp);
 
         //Get variable name 
@@ -264,7 +487,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         ERRIFGOTO(result, _EXIT);
 
         result = DBHandler_InsertApplicationHistory(pstAppManager->pDBconn,strDeviceId, strFunctionName, nEcdId, nErrorCode);
-        
+
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
@@ -295,7 +518,7 @@ cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerU
 
     pstAppManager->strBrokerURI = CAPString_New();
     ERRMEMGOTO(pstAppManager->strBrokerURI, result, _EXIT);
-    
+
     result = DBHandler_OpenDB(pstDBInfo, &pstAppManager->pDBconn);
     ERRIFGOTO(result, _EXIT);
 
