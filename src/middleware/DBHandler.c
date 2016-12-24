@@ -19,13 +19,9 @@
 #define QUERY_SIZE 1024*16
 #define NULL_ERROR -1
 
-//TODO
-//Receive MYQL * as an argument, but use g_pDBconn internally.
-//This is because it shows error when it uses pDBconnParam as an argument
-//Check why this happens when it points to same address when checking with gdb 
 static cap_result callQueryWithResult(MYSQL* pDBconn, char* query, MYSQL_RES **ppMysqlResult, int *pnRowCount)
 {
-    cap_result ret = ERR_CAP_UNKNOWN;
+    cap_result result = ERR_CAP_UNKNOWN;
     int nQueryRet = 0;
 
     nQueryRet = mysql_query(pDBconn, query);
@@ -33,7 +29,7 @@ static cap_result callQueryWithResult(MYSQL* pDBconn, char* query, MYSQL_RES **p
     //fprintf(stderr, "Mysql connection error : %s, mysql_errno : %d\n", mysql_error(&pDBconn), mysql_errno(&pDBconn));
     if (nQueryRet != 0) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: callQueryWithResult Error : %d",nQueryRet );
-        ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
+        ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
     }
 
     /* Warning! 
@@ -43,30 +39,30 @@ static cap_result callQueryWithResult(MYSQL* pDBconn, char* query, MYSQL_RES **p
     *ppMysqlResult = mysql_store_result(pDBconn);
     if(*ppMysqlResult == NULL) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: Result Store Error : %d", nQueryRet);
-        ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
+        ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
     }
 
     *pnRowCount = mysql_num_fields(*ppMysqlResult);
 
-    ret = ERR_CAP_NOERROR;
+    result = ERR_CAP_NOERROR;
 _EXIT:
-    return ret;
+    return result;
 }
 
 static cap_result callQuery(MYSQL* pDBconn, char* query)
 {
-    cap_result ret = ERR_CAP_UNKNOWN;
+    cap_result result = ERR_CAP_UNKNOWN;
     int nQueryRet = 0;
     
     nQueryRet = mysql_query(pDBconn, query);
     if (nQueryRet != 0) {
 		CAPLogger_Write(g_hLogger, MSG_ERROR, "DBHandler: callQuery Error : %d", nQueryRet);
-        ERRASSIGNGOTO(ret, ERR_CAP_DB_ERROR, _EXIT);
+        ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
     }
 
-    ret = ERR_CAP_NOERROR;
+    result = ERR_CAP_NOERROR;
 _EXIT:
-    return ret;
+    return result;
 }
 
 cap_result DBHandler_OpenDB(IN SDBInfo *pstDBInfo, OUT MYSQL **ppDBconn)
@@ -101,6 +97,99 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
     }
 }
 
+/*
+static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    char *pszToken, *pszPtr = NULL;
+    int nTokenCount, nUserThingId = 0, nArgumentLen;
+    char *pszVariableName = NULL, *pszHead = NULL, *pszTail = NULL;
+    cap_bool bIsHeadExist = FALSE, bIsTailExist = FALSE;
+
+    //check if head and tail exists
+    nArgumentLen = strlen(pszArgumentPayload);
+    
+    if(pszArgumentPayload[0] == '{' && pszArgumentPayload[1] == '{') {
+        bIsHeadExist = TRUE;
+    }
+    else {
+        bIsHeadExist = FALSE;
+    }
+
+    if(pszTempArgumentPayload[nArgumentLen - 2] == '}' && pszArgumentPayload[nArgumentLen - 1] == '}'){
+        bIsTailExist = TRUE;
+    }
+    else {
+        bIsTailExist = FALSE;
+    }
+
+    //case : {{user_thing_id#variable_name}} 
+
+    //TODO
+    //consider head and tail!!
+
+    //First Token -> Head 
+    if( (pszToken = strtok_r(pszTempArgumentPayload, "{{", &pszPtr)) ) {
+        if(bIsHeadExist) {
+            pszHead = strdup(pszToken);
+        }
+        nTokenCount++;
+    }
+    
+    //Second Token -> user_thing_id
+    if( (pszToken = strtok_r(NULL, "#", &pszPtr)) ) {
+        nUserThingId = atoi(pszToken);
+        nTokenCount++;
+    }
+
+    //Third Token -> variable_name
+    if( (pszToken = strtok_r(NULL, "}}", &pszPtr)) ) {
+        pszVariableName = strdup(pszToken); 
+        nTokenCount++;
+    }
+
+    if(nTokenCount != 3) {
+        dlp("replacing variable parsing error!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+    
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                var_history.value\
+            FROM\
+                things_variablehistory var_history,\
+                things_variable var
+            WHERE\
+                var.identifier = '%s' and\
+                var_history.user_thing_id = %d and\
+                var_history.variable_id = var.id\
+            ORDERY BY
+                var_history.updated_at desc limit 1;", pszVariableName, nUserThingId);
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    if(mysqlRow == NULL){
+        dlp("There is no matching value yet!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+
+    mysqlRow[0]
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMEMFREE(pszTempArgumentPayload);
+    SAFEMEMFREE(pszVariableName);
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+*/
 static cap_result checkDeviceWithId(IN MYSQL *pDBconn,IN cap_string strDeviceId) {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
