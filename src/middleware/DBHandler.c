@@ -98,6 +98,9 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
 }
 
 /*
+//Replace variable in string with actual variable
+//However, when variable does not exist, returns original string.
+//This is for a case where an user actually uses predefined delimeter in string ( ex. check items {{water, cup, etc}} )
 static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -108,30 +111,34 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgument
     char *pszToken, *pszPtr = NULL;
     int nTokenCount, nUserThingId = 0, nArgumentLen;
     char *pszVariableName = NULL, *pszHead = NULL, *pszTail = NULL;
+    char *pszTempArgumentPayload = NULL;
     cap_bool bIsHeadExist = FALSE, bIsTailExist = FALSE;
 
+    //Copy original string to reserve for later purposes
+    pszTempArgumentPayload = strdup(pszArgumentPayload);
+
     //check if head and tail exists
-    nArgumentLen = strlen(pszArgumentPayload);
+    nArgumentLen = strlen(pszTempArgumentPayload);
     
-    if(pszArgumentPayload[0] == '{' && pszArgumentPayload[1] == '{') {
-        bIsHeadExist = TRUE;
-    }
-    else {
+    if(pszTempArgumentPayload[0] == '{' && pszTempArgumentPayload[1] == '{') {
         bIsHeadExist = FALSE;
     }
+    else {
+        bIsHeadExist = TRUE;
+    }
 
-    if(pszTempArgumentPayload[nArgumentLen - 2] == '}' && pszArgumentPayload[nArgumentLen - 1] == '}'){
-        bIsTailExist = TRUE;
+    if(pszTempArgumentPayload[nArgumentLen - 2] == '}' && pszTempArgumentPayload[nArgumentLen - 1] == '}'){
+        bIsTailExist = FALSE;
     }
     else {
-        bIsTailExist = FALSE;
+        bIsTailExist = TRUE;
     }
 
     //case : {{user_thing_id#variable_name}} 
 
     //TODO
     //consider head and tail!!
-
+ 
     //First Token -> Head 
     if( (pszToken = strtok_r(pszTempArgumentPayload, "{{", &pszPtr)) ) {
         if(bIsHeadExist) {
