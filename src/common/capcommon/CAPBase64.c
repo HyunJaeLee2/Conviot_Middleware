@@ -140,9 +140,9 @@ _EXIT:
 cap_result CAPBase64_Decode(IN char *pEncodedData, OUT char **ppDecodedData, OUT int *pnDecodedLen)
 {
 	cap_result result = ERR_CAP_UNKNOWN;
-	int nBytesDecoded = 0;
 	char *pBufferOut = NULL;
-	int nPrbytes = 0;
+    int nBytesEncoded = 0;
+	int nBytesDecoded = 0;
 	int ni = 0;
 	int nj = 0;
 	int nblank = 0;
@@ -152,17 +152,23 @@ cap_result CAPBase64_Decode(IN char *pEncodedData, OUT char **ppDecodedData, OUT
 	IFVARERRASSIGNGOTO(ppDecodedData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 	
 	IFVARERRASSIGNGOTO(pnDecodedLen, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-	
-	result = CAPBase64_Decode_Len(pEncodedData, &nPrbytes);
+
+	result = CAPBase64_Decode_Len(pEncodedData, &nBytesDecoded);
 	if( result != ERR_CAP_NOERROR ){
 		goto _EXIT;
 	}
 	else result = ERR_CAP_UNKNOWN;
 
-	pBufferOut = (char*)malloc(nBytesDecoded * sizeof(char));
+    result = CAPBase64_Encode_Len(nBytesDecoded, &nBytesEncoded);
+	if( result != ERR_CAP_NOERROR ){
+		goto _EXIT;
+	}
+	else result = ERR_CAP_UNKNOWN;
+
+	pBufferOut = (char*)malloc((nBytesEncoded+1) * sizeof(char));
 	ERRMEMGOTO(pBufferOut, result, _EXIT);
 	
-	for(ni = 0; ni < nPrbytes; ni = ni+4, nj = nj+3)
+	for(ni = 0; ni < nBytesEncoded; ni = ni+4, nj = nj+3)
 	{
 		stemp.e4 = cap_decode_base64[(unsigned char)pEncodedData[ni]];
 		stemp.e3 = cap_decode_base64[(unsigned char)pEncodedData[ni+1]];
@@ -181,8 +187,9 @@ cap_result CAPBase64_Decode(IN char *pEncodedData, OUT char **ppDecodedData, OUT
 		pBufferOut[nj+1] = stemp.c2;
 		pBufferOut[nj+2] = stemp.c1;
 	}
-	*pnDecodedLen = nj - nblank;
-	pBufferOut[nj-nblank] = '\0';
+	*pnDecodedLen = nBytesDecoded - nblank;
+	pBufferOut[nBytesDecoded - nblank] = '\0';
+    *ppDecodedData = pBufferOut;
 
 	result = ERR_CAP_NOERROR;
 _EXIT:
@@ -195,3 +202,4 @@ _EXIT:
 	}
 	return result;
 }
+
