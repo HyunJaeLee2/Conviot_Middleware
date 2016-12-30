@@ -37,22 +37,6 @@ CAPSTRING_CONST(CAPSTR_SCENARIO_RESULT, "MT/REQUEST_FUNCTION/");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, "/");
 CAPSTRING_CONST(CAPSTR_MT, "MT/");
 
-static CALLBACK cap_result destroyEca(int nOffset, void* pData, void* pUsrData)
-{
-    cap_result result = ERR_CAP_UNKNOWN;
-    SEcaContext* pstEcaContext = NULL;
-
-    IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-    pstEcaContext = (SEcaContext*)pData;
-
-    SAFEMEMFREE(pstEcaContext);
-
-    result = ERR_CAP_NOERROR;
-_EXIT:
-    return result;
-}
-
 static CALLBACK cap_result destroyRelatedCondtion(int nOffset, void* pData, void* pUsrData)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -265,6 +249,26 @@ _EXIT:
     return result;
 }
 
+/*
+static cap_result actuateSingleConditionEca(SConditionContext* pstConditionContext) 
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_bool bIsSatisfied = FALSE;
+
+    IFVARERRASSIGNGOTO(pstConditionContext, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    if(pstConditionContext->bIsSatisfied = bIsSatisfied)
+    {
+
+    }
+    
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+*/
+
 static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, char *pszVariable)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -283,6 +287,11 @@ static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, 
 
         result = computeSingleCondition(pstConditionContext, pszVariable);
         ERRIFGOTO(result, _EXIT);
+   
+        /*
+        result = actuateSingleConditionEca(pstConditionContext);
+        ERRIFGOTO(result, _EXIT);
+        */
     }
 
     result = ERR_CAP_NOERROR;
@@ -358,16 +367,13 @@ _EXIT:
 
 static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
     cap_result result = ERR_CAP_UNKNOWN;
-    cap_handle hRelatedConditionList = NULL, hEcaList = NULL; 
+    cap_handle hRelatedConditionList = NULL; 
 
     result = CAPLinkedList_Create(&hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
 
-    result = CAPLinkedList_Create(&hEcaList);
-    ERRIFGOTO(result, _EXIT);
-
-    //1. Get Condition List and ECA List
-    result = DBHandler_MakeConditionAndEcaList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList, hEcaList);
+    //1. Get Condition List
+    result = DBHandler_MakeConditionList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
 
     //2. Compute Each condition 
@@ -375,7 +381,8 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     ERRIFGOTO(result, _EXIT);
 
     //3. if there is only one condition, publish action
-    //4 push is_satisfied of each condition into db
+
+    //4 push is_satisfied of each condition into db(if there is only one condition, ignore this step)
     //5. Compute each eca if condition is met(only if there is more than one condition)
     //6. Actuate function where eca condition is met
 
@@ -385,9 +392,7 @@ _EXIT:
     }
 
     CAPLinkedList_Traverse(hRelatedConditionList, destroyRelatedCondtion, NULL);
-    CAPLinkedList_Traverse(hEcaList, destroyEca, NULL);
     CAPLinkedList_Destroy(&hRelatedConditionList);
-    CAPLinkedList_Destroy(&hEcaList);
     return result;
 
 }

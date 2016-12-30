@@ -516,8 +516,8 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string strDeviceId,\
-        IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList, IN OUT cap_handle hEcaList)
+cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDeviceId,\
+        IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -557,7 +557,6 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
     while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
     {
         SConditionContext *pstConditionContext = (SConditionContext*)calloc(1, sizeof(SConditionContext));    
-        SEcaContext *pstEcaContext = (SEcaContext*)calloc(1, sizeof(SEcaContext));    
     
         pstConditionContext->strExpression = CAPString_New();
         ERRMEMGOTO(pstConditionContext->strExpression, result, _EXIT);
@@ -567,14 +566,14 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
         result = CAPString_SetLow(pstConditionContext->strExpression, mysqlRow[1] , CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
 
-        pstEcaContext->nEcaId = atoiIgnoreNull(mysqlRow[2]);
+        pstConditionContext->nEcaId = atoiIgnoreNull(mysqlRow[2]);
 
         //check operator
         if(strncmp(mysqlRow[3], "and", 3) == 0){
-            pstEcaContext->enOp = OPERATOR_AND;
+            pstConditionContext->enEcaOp = OPERATOR_AND;
         }
         else if(strncmp(mysqlRow[3], "or", 2) == 0){
-            pstEcaContext->enOp = OPERATOR_OR;
+            pstConditionContext->enEcaOp = OPERATOR_OR;
         }
         else {
             //Not supported
@@ -611,9 +610,6 @@ cap_result DBHandler_MakeConditionAndEcaList(IN MYSQL *pDBconn, IN cap_string st
         }
         
         result = CAPLinkedList_Add(hRelatedConditionList, LINKED_LIST_OFFSET_LAST, 0, pstConditionContext);
-        ERRIFGOTO(result, _EXIT);
-
-        result = CAPLinkedList_Add(hEcaList, LINKED_LIST_OFFSET_LAST, 0, pstEcaContext);
         ERRIFGOTO(result, _EXIT);
     }
 
