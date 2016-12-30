@@ -246,6 +246,48 @@ cap_result DBHandler_CloseDB(MYSQL *pDBconn)
     return result;
 }
 
+cap_result DBHandler_RetrieveApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN OUT char **ppszApiKey)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+
+    int nRowCount = 0;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                vendor.api_key\
+           FROM\
+                things_device device,\
+                things_userthing userthing,\
+                things_product product,\
+                things_vendor vendor\
+            WHERE\
+                device.device_id = '%s' and\
+                userthing.id = device.user_thing_id and\
+                product.id = device.user_thing_id and\
+                vendor.id = product.vendor_id;", CAPString_LowPtr(strDeviceId, NULL));
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+
+    //if there is no matching device
+    if(mysqlRow == NULL){
+        dlp("There is no matching device!\n");
+    }
+    else {
+        *ppszApiKey = strdup(mysqlRow[0]);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
 cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszApiKey)
 {
     cap_result result = ERR_CAP_UNKNOWN;

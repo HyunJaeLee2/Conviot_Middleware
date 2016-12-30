@@ -363,7 +363,7 @@ _EXIT:
 }
 
 
-static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppManager, cap_string strClientId,
+static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppManager, cap_string strDeviceId,
         cap_string strTopicCategory, cap_string strErrorString)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -372,10 +372,11 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     char* pszPayload = NULL;
     int nPayloadLen = 0;
     EMqttErrorCode enError;
+    char *pszApiKey = NULL;
     json_object* pJsonObject;
 
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-    IFVARERRASSIGNGOTO(strClientId, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+    IFVARERRASSIGNGOTO(strDeviceId, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
     IFVARERRASSIGNGOTO(strErrorString, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     pstAppManager = (SAppManager*)hAppManager;
@@ -387,7 +388,7 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     result = CAPString_Set(strTopic, strTopicCategory);
     ERRIFGOTO(result, _EXIT);
 
-    result = CAPString_AppendString(strTopic, strClientId);
+    result = CAPString_AppendString(strTopic, strDeviceId);
     ERRIFGOTO(result, _EXIT);
 
     //make error code depend on result value
@@ -407,11 +408,23 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     //set payload
     pJsonObject = json_object_new_object();
     json_object_object_add(pJsonObject, "error", json_object_new_int(enError));
+    
+    result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
+    ERRIFGOTO(result, _EXIT);
 
+    if(pszApiKey == NULL) {
+        //do nothing
+    } 
+    else {
+        json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
+    }
+
+    /*
     if( CAPString_Length(strErrorString) > 0)
     {
         json_object_object_add(pJsonObject, "error_string", json_object_new_string(CAPString_LowPtr(strErrorString, NULL)));
     }
+    */
 
     pszPayload = strdup(json_object_to_json_string(pJsonObject));
     nPayloadLen = strlen(pszPayload);

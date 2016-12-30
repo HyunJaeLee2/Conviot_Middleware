@@ -133,6 +133,7 @@ static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hTh
     SThingManager* pstThingManager = NULL;
     cap_string strTopic = NULL;
     char* pszPayload;
+    char *pszApiKey = NULL;
     int nPayloadLen = 0;
     EMqttErrorCode enError;
     json_object* pJsonObject;
@@ -165,10 +166,20 @@ static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hTh
     else {
         enError = ERR_MQTT_FAIL;
     }
-
+    
     //set payload
     pJsonObject = json_object_new_object();
     json_object_object_add(pJsonObject, "error", json_object_new_int(enError));
+
+    result = DBHandler_RetrieveApiKey(pstThingManager->pDBconn, strMessageReceiverId, &pszApiKey);
+    ERRIFGOTO(result, _EXIT);
+
+    if(pszApiKey == NULL) {
+        //do nothing
+    } 
+    else {
+        json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
+    }
 
     pszPayload = strdup(json_object_to_json_string(pJsonObject));
     nPayloadLen = strlen(pszPayload);
