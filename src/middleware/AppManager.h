@@ -32,7 +32,6 @@ typedef struct _SConditionContext {
     int nEcaId; //related eca id
     EOperator enEcaOp; //related eca operator
 } SConditionContext;
-
 /*
 typedef struct _SEcaContext {
     int nEcaId;

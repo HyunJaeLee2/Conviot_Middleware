@@ -484,7 +484,7 @@ cap_result MQTTMessageHandler_Publish(cap_handle hHandler, cap_string strTopic, 
     IFVARERRASSIGNGOTO(pstHandler->bConnected, FALSE, result, ERR_CAP_NOT_CONNECTED, _EXIT);
 
     pstHandler->nDeliveredToken = 0;
-    //publish thing list
+    
     nMqttRet = MQTTClient_publish(pstHandler->hClient, CAPString_LowPtr(strTopic, NULL), nPayloadLen, pszPayload, QOS_LEVEL_2, 0, &nToken);
     if (nMqttRet != MQTTCLIENT_SUCCESS) {
         CAPLogger_Write(g_hLogger, MSG_ERROR, "MQTTClient_publish error!\n Error msg: %d", nMqttRet);

@@ -32,7 +32,7 @@ CAPSTRING_CONST(CAPSTR_MQTT_CLIENT_ID, MQTT_CLIENT_ID);
 CAPSTRING_CONST(CAPSTR_CATEGORY_FUNCTION_RESULT, "FUNCTION_RESULT");
 CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
 
-CAPSTRING_CONST(CAPSTR_SCENARIO_RESULT, "MT/REQUEST_FUNCTION/");
+CAPSTRING_CONST(CAPSTR_REQUEST_FUNCTION, "MT/REQUEST_FUNCTION/");
 
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, "/");
 CAPSTRING_CONST(CAPSTR_MT, "MT/");
@@ -54,6 +54,24 @@ _EXIT:
     return result;
 }
 
+/*
+static CALLBACK cap_result destroyArgument(int nOffset, void* pData, void* pUsrData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SConditionContext* pstConditionContext = NULL;
+
+    IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstConditionContext = (SConditionContext*)pData;
+
+	SAFE_CAPSTRING_DELETE(pstConditionContext->strExpression);
+    SAFEMEMFREE(pstConditionContext);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+*/
 static EOperator convertStringOperatorToEnum(char *pszOperator, int nOperatorIndex){
     if(strncmp(pszOperator, "<=", 2) == 0){
         if(nOperatorIndex == 1){
@@ -249,34 +267,75 @@ _EXIT:
     return result;
 }
 
-/*
-static cap_result actuateSingleConditionEca(SConditionContext* pstConditionContext) 
+static cap_result requestFunction(int nEcaId, IN cap_string strDeviceId, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
-    cap_bool bIsSatisfied = FALSE;
-
-    IFVARERRASSIGNGOTO(pstConditionContext, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-    if(pstConditionContext->bIsSatisfied = bIsSatisfied)
-    {
-
-    }
+    json_object* pJsonObject = NULL, *pJsonArgumentArray = NULL;
+    cap_string strTopic = NULL;
+    SAppManager *pstAppManager = NULL;
+    const char* pszConstEcaId = "eca_id", *pszConstArguments = "arguments", *pszConstName = "name", *pszConstValue = "value";
+    char *pszArgumentPayload = NULL, *pszFunctionName = NULL;
+    char *pszPayload = NULL;
+    int nPayloadLen;
     
+    IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstAppManager = (SAppManager *)hAppManager;
+
+    result = DBHandler_RetrieveArgumentList(pstAppManager->pDBconn, nEcaId, &pszArgumentPayload, &pszFunctionName);
+    ERRIFGOTO(result, _EXIT);
+    
+    //set topic
+    strTopic = CAPString_New();
+    ERRMEMGOTO(strTopic, result, _EXIT);
+
+    result = CAPString_Set(strTopic, CAPSTR_REQUEST_FUNCTION);
+    ERRIFGOTO(result, _EXIT);
+
+    result = CAPString_AppendString(strTopic, strDeviceId);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = CAPString_AppendLow(strTopic, pszFunctionName, CAPSTRING_MAX);
+    ERRIFGOTO(result, _EXIT);
+
+    pJsonObject = json_object_new_object();
+    ERRMEMGOTO(pJsonObject, result, _EXIT);
+
+    //add eca id
+    json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
+
+    //parse argument payload string to json object to add it to json
+    result = ParsingJson(&pJsonArgumentArray, pszArgumentPayload, strlen(pszArgumentPayload));
+    ERRIFGOTO(result, _EXIT);
+
+    json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray); 
+  
+    pszPayload = strdup(json_object_to_json_string(pJsonObject));
+    nPayloadLen = strlen(pszPayload);
+
+    result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
+    ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFEJSONFREE(pJsonObject);
+    SAFEMEMFREE(pszPayload);
+    SAFE_CAPSTRING_DELETE(strTopic);
     return result;
 }
-*/
 
-static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, char *pszVariable)
+static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, char *pszVariable, IN cap_string strDeviceId, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SConditionContext* pstConditionContext = NULL;
+    SAppManager *pstAppManager = NULL;
     int nLength = 0;
     int nLoop = 0;
 
     IFVARERRASSIGNGOTO(hRelatedConditionList, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+    IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstAppManager = (SAppManager *)hAppManager;
 
     result = CAPLinkedList_GetLength(hRelatedConditionList, &nLength);
     ERRIFGOTO(result, _EXIT);
@@ -287,11 +346,14 @@ static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, 
 
         result = computeSingleCondition(pstConditionContext, pszVariable);
         ERRIFGOTO(result, _EXIT);
-   
-        /*
-        result = actuateSingleConditionEca(pstConditionContext);
-        ERRIFGOTO(result, _EXIT);
-        */
+ 
+        //if it is single condition and satisfied, publish actuate message right away.
+        if(pstConditionContext->bIsSingleCondition && pstConditionContext->bIsSatisfied)
+        {
+            result = requestFunction(pstConditionContext->nEcaId, strDeviceId, hAppManager);
+            ERRIFGOTO(result, _EXIT);
+
+        }
     }
 
     result = ERR_CAP_NOERROR;
@@ -376,15 +438,13 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     result = DBHandler_MakeConditionList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
 
-    //2. Compute Each condition 
-    result = computeRelatedConditionList(hRelatedConditionList, pszVariable);
+    //2. Compute Each condition -> if there is only one condition, publish action
+    result = computeRelatedConditionList(hRelatedConditionList, pszVariable, strDeviceId, (cap_handle)pstAppManager );
     ERRIFGOTO(result, _EXIT);
 
-    //3. if there is only one condition, publish action
-
-    //4 push is_satisfied of each condition into db(if there is only one condition, ignore this step)
-    //5. Compute each eca if condition is met(only if there is more than one condition)
-    //6. Actuate function where eca condition is met
+    //push is_satisfied of each condition into db(if there is only one condition, ignore this step)
+    // Compute each eca if condition is met(only if there is more than one condition)
+    // Actuate function where eca condition is met
 
 _EXIT:
     if(result != ERR_CAP_NOERROR){
@@ -468,7 +528,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         json_object* pJsonTemp;
         cap_string strFunctionName = NULL;
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
-        int nErrorCode = 0, nEcdId = 0;
+        int nErrorCode = 0, nEcaId = 0;
 
         /*
         //If api key error has occured, goto exit 
@@ -481,7 +541,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
 
-        nEcdId = json_object_get_int(pJsonTemp);
+        nEcaId = json_object_get_int(pJsonTemp);
 
         if (!json_object_object_get_ex(pJsonObject, pszConstError, &pJsonTemp)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
@@ -493,7 +553,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
-        result = DBHandler_InsertApplicationHistory(pstAppManager->pDBconn,strDeviceId, strFunctionName, nEcdId, nErrorCode);
+        result = DBHandler_InsertApplicationHistory(pstAppManager->pDBconn,strDeviceId, strFunctionName, nEcaId, nErrorCode);
 
     }
     else {

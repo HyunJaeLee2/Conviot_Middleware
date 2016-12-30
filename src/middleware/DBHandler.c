@@ -370,6 +370,18 @@ _EXIT:
 
 }
 
+cap_result DBHandler_RetrieveArgumentList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT char **ppszArgumentPayload, IN OUT char **ppszFunctionName)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+
+    //TODO
+    
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
+
 cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceId)
 {
     cap_result result = ERR_CAP_UNKNOWN;
