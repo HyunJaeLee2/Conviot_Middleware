@@ -616,10 +616,10 @@ cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDevic
         pstConditionContext->nEcaId = atoiIgnoreNull(mysqlRow[2]);
 
         //check operator
-        if(strncmp(mysqlRow[3], "and", 3) == 0){
+        if(strncmp(mysqlRow[3], "all", 3) == 0){
             pstConditionContext->enEcaOp = OPERATOR_AND;
         }
-        else if(strncmp(mysqlRow[3], "or", 2) == 0){
+        else if(strncmp(mysqlRow[3], "any", 2) == 0){
             pstConditionContext->enEcaOp = OPERATOR_OR;
         }
         else {
@@ -692,7 +692,6 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
     while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
     {
         SActionContext *pstActionContext = (SActionContext*)calloc(1, sizeof(SActionContext));   
-        char *pszFinalArgumentPayload = NULL;
     
         pstActionContext->strFunctionName = CAPString_New();
         ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
@@ -723,6 +722,88 @@ _EXIT:
     return result;
 }
 
+cap_result DBHandler_RetrieveSatisfiedEcaList(IN MYSQL *pDBconn, IN OUT cap_handle hSatisfiedEcaList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                eca.id\
+            FROM\
+                things_eventconditionaction eca\
+            WHERE\
+                NOT EXISTS(\
+                    SELECT\
+                        *\
+                    FROM\
+                        things_condition cond\
+                    WHERE\
+                        cond.event_condition_action_id = eca.id and\
+                         cond.is_satisfied = 0\
+                    );");
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
+    {
+        int nSatisfiedEca = atoiIgnoreNull(mysqlRow[0]);
+
+        result = CAPLinkedList_Add(hSatisfiedEcaList, LINKED_LIST_OFFSET_LAST, 0, (void *)&nSatisfiedEca);
+        ERRIFGOTO(result, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+cap_result DBHandler_InsertSatisfiedCondition(IN MYSQL *pDBconn, IN cap_handle hRelatedConditionList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    int nLength = 0;
+    int nLoop = 0;
+    SConditionContext* pstConditionContext = NULL;
+
+    result = CAPLinkedList_GetLength(hRelatedConditionList, &nLength);
+    ERRIFGOTO(result, _EXIT);
+
+    for(nLoop = 0; nLoop < nLength; nLoop++){
+        result = CAPLinkedList_Get(hRelatedConditionList, LINKED_LIST_OFFSET_FIRST, nLoop, (void**)&pstConditionContext);
+        ERRIFGOTO(result, _EXIT);
+
+        //if condition is satisfied and there is only one condition or operator 'any' condition -> do nothing 
+        //else -> set is_satisfied to TRUE
+        if(pstConditionContext->bIsSatisfied) {
+            if(pstConditionContext->bIsSingleCondition || pstConditionContext->enEcaOp == OPERATOR_OR) {
+                //do nothing
+            }
+            else {
+                snprintf(query, QUERY_SIZE, "\
+                        UPDATE\
+                            things_condition condition\
+                        SET\
+                            condition.is_satisfied = 1\
+                        where\
+                            condition.id = %d;", pstConditionContext->nConditionId);
+                
+                result = callQuery(pDBconn, query);
+                ERRIFGOTO(result, _EXIT);
+            }
+        }
+    }
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
 
 
 
