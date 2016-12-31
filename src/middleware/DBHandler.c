@@ -97,6 +97,11 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
     }
 }
 
+static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
+{
+    //TODO
+    return 1;
+}
 /*
 //Replace variable in string with actual variable
 //However, when variable does not exist, returns original string.
@@ -412,18 +417,6 @@ _EXIT:
 
 }
 
-cap_result DBHandler_RetrieveArgumentList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT char **ppszArgumentPayload, IN OUT char **ppszFunctionName)
-{
-    cap_result result = ERR_CAP_UNKNOWN;
-    char query[QUERY_SIZE];
-
-    //TODO
-    
-    result = ERR_CAP_NOERROR;
-_EXIT:
-    return result;
-}
-
 cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceId)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -673,6 +666,62 @@ _EXIT:
     return result;
 }
 
+
+cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    char *pszArgumentPayload = NULL;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                function.identifier,\
+                action.arguments\
+            FROM\
+                things_function function,\
+                things_action action\
+            WHERE\
+                action.event_condition_action_id = %d and\
+                function.id = action.function_id;", nEcaId);
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
+    {
+        SActionContext *pstActionContext = (SActionContext*)calloc(1, sizeof(SActionContext));   
+        char *pszFinalArgumentPayload = NULL;
+    
+        pstActionContext->strFunctionName = CAPString_New();
+        ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
+        
+        pstActionContext->strArgumentPayload = CAPString_New();
+        ERRMEMGOTO(pstActionContext->strArgumentPayload, result, _EXIT);
+        
+        result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
+        //TODO
+        //replaceWithRealVariable then add it to structure 
+        result = replaceWithRealVariable(pDBconn, mysqlRow[1], &pszArgumentPayload);
+        ERRIFGOTO(result, _EXIT);
+        
+        result = CAPString_SetLow(pstActionContext->strArgumentPayload, pszArgumentPayload , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+        
+        result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);
+        ERRIFGOTO(result, _EXIT);
+
+        SAFEMEMFREE(pszArgumentPayload);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
 
 
 

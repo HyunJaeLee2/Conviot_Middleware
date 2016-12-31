@@ -32,12 +32,11 @@ typedef struct _SConditionContext {
     int nEcaId; //related eca id
     EOperator enEcaOp; //related eca operator
 } SConditionContext;
-/*
-typedef struct _SEcaContext {
-    int nEcaId;
-    EOperator enOp;
-} SEcaContext;
-*/
+
+typedef struct _SActionContext {
+    cap_string strFunctionName;	
+    cap_string strArgumentPayload;	
+} SActionContext;
 
 cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerURI, IN SDBInfo *pstDBInfo);
 cap_result AppManager_Run(cap_handle hAppManager);

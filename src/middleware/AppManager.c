@@ -20,6 +20,7 @@
 #define MQTT_CLIENT_DISCONNECT_TIMEOUT (10000)
 #define MQTT_RECEIVE_TIMEOUT (3000)
 #define MQTT_SUBSCRIPTION_NUM (sizeof(paszAppManagerSubcriptionList) / sizeof(char*))
+#define TOPIC_SEPERATOR "/"
 
 static char* paszAppManagerSubcriptionList[] = {
     "TM/SEND_VARIABLE/#",
@@ -33,8 +34,8 @@ CAPSTRING_CONST(CAPSTR_CATEGORY_FUNCTION_RESULT, "FUNCTION_RESULT");
 CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
 
 CAPSTRING_CONST(CAPSTR_REQUEST_FUNCTION, "MT/REQUEST_FUNCTION/");
+CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, TOPIC_SEPERATOR);
 
-CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, "/");
 CAPSTRING_CONST(CAPSTR_MT, "MT/");
 
 static CALLBACK cap_result destroyRelatedCondtion(int nOffset, void* pData, void* pUsrData)
@@ -54,24 +55,24 @@ _EXIT:
     return result;
 }
 
-/*
-static CALLBACK cap_result destroyArgument(int nOffset, void* pData, void* pUsrData)
+static CALLBACK cap_result destroyAction(int nOffset, void* pData, void* pUsrData)
 {
     cap_result result = ERR_CAP_UNKNOWN;
-    SConditionContext* pstConditionContext = NULL;
+    SActionContext* pstActionContext = NULL;
 
     IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
-    pstConditionContext = (SConditionContext*)pData;
+    pstActionContext = (SActionContext*)pData;
 
-	SAFE_CAPSTRING_DELETE(pstConditionContext->strExpression);
-    SAFEMEMFREE(pstConditionContext);
+	SAFE_CAPSTRING_DELETE(pstActionContext->strFunctionName);
+	SAFE_CAPSTRING_DELETE(pstActionContext->strArgumentPayload);
+    SAFEMEMFREE(pstActionContext);
 
     result = ERR_CAP_NOERROR;
 _EXIT:
     return result;
 }
-*/
+
 static EOperator convertStringOperatorToEnum(char *pszOperator, int nOperatorIndex){
     if(strncmp(pszOperator, "<=", 2) == 0){
         if(nOperatorIndex == 1){
@@ -267,7 +268,7 @@ _EXIT:
     return result;
 }
 
-static cap_result requestFunction(int nEcaId, IN cap_string strDeviceId, cap_handle hAppManager)
+static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     json_object* pJsonObject = NULL, *pJsonArgumentArray = NULL;
@@ -277,15 +278,20 @@ static cap_result requestFunction(int nEcaId, IN cap_string strDeviceId, cap_han
     char *pszArgumentPayload = NULL, *pszFunctionName = NULL;
     char *pszPayload = NULL;
     int nPayloadLen;
+    cap_handle hActionList = NULL; 
     
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     pstAppManager = (SAppManager *)hAppManager;
+    
+    result = CAPLinkedList_Create(&hActionList);
+    ERRIFGOTO(result, _EXIT);
 
-    result = DBHandler_RetrieveArgumentList(pstAppManager->pDBconn, nEcaId, &pszArgumentPayload, &pszFunctionName);
+    result = DBHandler_RetrieveActionList(pstAppManager->pDBconn, nEcaId, hActionList);
     ERRIFGOTO(result, _EXIT);
     
     //set topic
+    //Format : MT/REQUEST_FUNCTION/[Thing ID]/[Function name]
     strTopic = CAPString_New();
     ERRMEMGOTO(strTopic, result, _EXIT);
 
@@ -293,6 +299,9 @@ static cap_result requestFunction(int nEcaId, IN cap_string strDeviceId, cap_han
     ERRIFGOTO(result, _EXIT);
 
     result = CAPString_AppendString(strTopic, strDeviceId);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = CAPString_AppendString(strTopic, CAPSTR_TOPIC_SEPERATOR);
     ERRIFGOTO(result, _EXIT);
     
     result = CAPString_AppendLow(strTopic, pszFunctionName, CAPSTRING_MAX);
@@ -321,6 +330,8 @@ _EXIT:
     SAFEJSONFREE(pJsonObject);
     SAFEMEMFREE(pszPayload);
     SAFE_CAPSTRING_DELETE(strTopic);
+    CAPLinkedList_Traverse(hActionList, destroyAction, NULL);
+    CAPLinkedList_Destroy(&hActionList);
     return result;
 }
 
@@ -350,7 +361,7 @@ static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, 
         //if it is single condition and satisfied, publish actuate message right away.
         if(pstConditionContext->bIsSingleCondition && pstConditionContext->bIsSatisfied)
         {
-            result = requestFunction(pstConditionContext->nEcaId, strDeviceId, hAppManager);
+            result = requestAction(pstConditionContext->nEcaId, strDeviceId, hAppManager);
             ERRIFGOTO(result, _EXIT);
 
         }

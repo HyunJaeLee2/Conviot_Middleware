@@ -26,7 +26,7 @@ cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceI
 cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable);
 cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcaId, IN int nErrorCode);
 cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList);
-cap_result DBHandler_RetrieveArgumentList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT char **ppszArgumentPayload, IN OUT char **ppszFunctionName);
+cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList);
 #ifdef __cplusplus
 }
 #endif
