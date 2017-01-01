@@ -16,6 +16,7 @@
 
 #include <json-c/json_object.h>
 
+#define MB 1024*1024
 #define QUERY_SIZE 1024*16
 #define NULL_ERROR -1
 
@@ -97,8 +98,7 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
     }
 }
 
-static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
-{
+static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload) {
     //TODO
     return 1;
 }
@@ -115,35 +115,37 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgument
     int nRowCount = 0;
     char *pszToken, *pszPtr = NULL;
     int nTokenCount, nUserThingId = 0, nArgumentLen;
-    char *pszVariableName = NULL, *pszHead = NULL, *pszTail = NULL;
-    char *pszTempArgumentPayload = NULL;
-    cap_bool bIsHeadExist = FALSE, bIsTailExist = FALSE;
-
-    //Copy original string to reserve for later purposes
-    pszTempArgumentPayload = strdup(pszArgumentPayload);
-
-    //check if head and tail exists
-    nArgumentLen = strlen(pszTempArgumentPayload);
-    
-    if(pszTempArgumentPayload[0] == '{' && pszTempArgumentPayload[1] == '{') {
-        bIsHeadExist = FALSE;
-    }
-    else {
-        bIsHeadExist = TRUE;
-    }
-
-    if(pszTempArgumentPayload[nArgumentLen - 2] == '}' && pszTempArgumentPayload[nArgumentLen - 1] == '}'){
-        bIsTailExist = FALSE;
-    }
-    else {
-        bIsTailExist = TRUE;
-    }
+    char *pszVariableName = NULL;
+    char pszFinalArgumentPayload[30 * MB] = NULL; //TODO Final Payload size is set 30MB for binary cases. However, it should be optimized with minimum size in the future
+    int nArgLen = 0, nTokenEndIndex = 0, nArgIndex = 0, nFinalArgIndex = 0;
+     
+    nArgLen = strlen(pszArgumentPayload);
 
     //case : {{user_thing_id#variable_name}} 
+    for(nArgIndex = 0; nArgIndex < nArgLen; nArgIndex++) {
+        if(nArgIndex == nArgLen -1) {
+            //If nArgIndex is pointing at the end of string, do nothing
+        }
+        else if(pszArgumentPayload[nArgIndex] == '{' && pszArgumentPayload[nArgIndex + 1] == '{') {
+            int nLoop = 0;
+            //Find index of "}} " 
+            for(nLoop = nArgIndex + 2; nLoop < nArgLen - 1; nLoop++) {
+                if(pszArgumentPayload[nLoop] == '}' && pszArgumentPayload[nLoop + 1] == '}') {
+                    nTokenEndIndex = nLoop + 1;
+                    break;
+                }  
+            }
+        }
+        else {
+            pszFinalArgumentPayload[nFinalArgIndex++] = pszArgumentPayload[nArgIndex];
+        }
+    }
 
-    //TODO
-    //consider head and tail!!
- 
+    pszFinalArgumentPayload[nFinalArgIndex] = '\0';
+
+    *ppszFinalArgumentPayload = strdup(pszFinalArgumentPayload);
+
+
     //First Token -> Head 
     if( (pszToken = strtok_r(pszTempArgumentPayload, "{{", &pszPtr)) ) {
         if(bIsHeadExist) {
@@ -179,7 +181,7 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgument
                 var.identifier = '%s' and\
                 var_history.user_thing_id = %d and\
                 var_history.variable_id = var.id\
-            ORDERY BY
+            ORDER BY\
                 var_history.updated_at desc limit 1;", pszVariableName, nUserThingId);
 
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
@@ -196,7 +198,6 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgument
 
     result = ERR_CAP_NOERROR;
 _EXIT:
-    SAFEMEMFREE(pszTempArgumentPayload);
     SAFEMEMFREE(pszVariableName);
     SAFEMYSQLFREE(pMysqlResult);
     return result;
