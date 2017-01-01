@@ -17,6 +17,8 @@
 #include <json-c/json_object.h>
 
 #define MB 1024*1024
+#define MAX_ARGUMENT_SIZE 30 * MB
+
 #define QUERY_SIZE 1024*16
 #define NULL_ERROR -1
 
@@ -98,11 +100,6 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
     }
 }
 
-static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload) {
-    //TODO
-    return 1;
-}
-/*
 //Replace variable in string with actual variable
 //However, when variable does not exist, returns original string.
 //This is for a case where an user actually uses predefined delimeter in string ( ex. check items {{water, cup, etc}} )
@@ -113,27 +110,78 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgument
     MYSQL_RES *pMysqlResult = NULL;
     MYSQL_ROW mysqlRow;
     int nRowCount = 0;
-    char *pszToken, *pszPtr = NULL;
-    int nTokenCount, nUserThingId = 0, nArgumentLen;
     char *pszVariableName = NULL;
-    char pszFinalArgumentPayload[30 * MB] = NULL; //TODO Final Payload size is set 30MB for binary cases. However, it should be optimized with minimum size in the future
-    int nArgLen = 0, nTokenEndIndex = 0, nArgIndex = 0, nFinalArgIndex = 0;
+    char pszFinalArgumentPayload[MAX_ARGUMENT_SIZE] = {0, }; //TODO Final Payload size is set 30MB for binary cases. However, it should be optimized with minimum size in the future
+    int nArgLen = 0, nArgIndex = 0, nFinalArgIndex = 0;
+    int nUserArgHead = 0, nUserArgTail = 0;
      
     nArgLen = strlen(pszArgumentPayload);
 
     //case : {{user_thing_id#variable_name}} 
     for(nArgIndex = 0; nArgIndex < nArgLen; nArgIndex++) {
+        //If nArgIndex is pointing at the end of string, put it to final argument
         if(nArgIndex == nArgLen -1) {
-            //If nArgIndex is pointing at the end of string, do nothing
+            pszFinalArgumentPayload[nFinalArgIndex++] = pszArgumentPayload[nArgIndex];
         }
         else if(pszArgumentPayload[nArgIndex] == '{' && pszArgumentPayload[nArgIndex + 1] == '{') {
             int nLoop = 0;
-            //Find index of "}} " 
+            char *pszUserArgument = NULL, *pszUserThingId = NULL, *pszVariableName = NULL;
+            int nUserThingId = 0, nLatestValueLen = 0;
+
+            //Each of nUserArgHead and nUserArgTail points to the start and the end of user arugument
+            nUserArgHead = nArgIndex + 2;
+
+            //Find index of "}}" 
             for(nLoop = nArgIndex + 2; nLoop < nArgLen - 1; nLoop++) {
                 if(pszArgumentPayload[nLoop] == '}' && pszArgumentPayload[nLoop + 1] == '}') {
-                    nTokenEndIndex = nLoop + 1;
+                    nUserArgTail = nLoop - 1;
                     break;
-                }  
+                } 
+            }
+
+            //Allocate memory for user argument with size including null at the end
+            pszUserArgument = (char *)malloc(sizeof(char) * (nUserArgTail - nUserArgHead + 2));
+            
+            //copy user argument from argument payload
+            strncpy(pszUserArgument, pszArgumentPayload + nUserArgHead, nUserArgTail - nUserArgHead + 1);
+           
+            //tokenize string with delimeter
+            pszUserThingId = strtok_r(pszUserArgument, "#", &pszVariableName);
+            nUserThingId = atoi(pszUserThingId);
+
+            //Get latest value of request
+            snprintf(query, QUERY_SIZE, "\
+                    SELECT\
+                        var_history.value\
+                    FROM\
+                        things_variablehistory var_history,\
+                        things_variable var\
+                    WHERE\
+                        var.identifier = '%s' and\
+                        var_history.user_thing_id = %d and\
+                        var_history.variable_id = var.id\
+                    ORDER BY\
+                        var_history.updated_at desc limit 1;", pszVariableName, nUserThingId);
+
+            result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+            ERRIFGOTO(result, _EXIT);
+
+            mysqlRow = mysql_fetch_row(pMysqlResult);
+
+            //If there is no matching value, just insert original string
+            if(mysqlRow == NULL){
+                dlp("There is no matching value yet!\n");
+                pszFinalArgumentPayload[nFinalArgIndex++] = pszArgumentPayload[nArgIndex];
+                continue;
+            }
+            //If there exists latest value, replace with it.
+            //nFinalArgIndex and nArgIndex is set according to the length of it.
+            else {
+                nLatestValueLen = strlen(mysqlRow[0]);
+                strncpy(pszFinalArgumentPayload + nFinalArgIndex, mysqlRow[0], nLatestValueLen);
+                nFinalArgIndex = nFinalArgIndex + nLatestValueLen;
+                nArgIndex = nUserArgTail + 2;
+                continue;
             }
         }
         else {
@@ -145,64 +193,12 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgument
 
     *ppszFinalArgumentPayload = strdup(pszFinalArgumentPayload);
 
-
-    //First Token -> Head 
-    if( (pszToken = strtok_r(pszTempArgumentPayload, "{{", &pszPtr)) ) {
-        if(bIsHeadExist) {
-            pszHead = strdup(pszToken);
-        }
-        nTokenCount++;
-    }
-    
-    //Second Token -> user_thing_id
-    if( (pszToken = strtok_r(NULL, "#", &pszPtr)) ) {
-        nUserThingId = atoi(pszToken);
-        nTokenCount++;
-    }
-
-    //Third Token -> variable_name
-    if( (pszToken = strtok_r(NULL, "}}", &pszPtr)) ) {
-        pszVariableName = strdup(pszToken); 
-        nTokenCount++;
-    }
-
-    if(nTokenCount != 3) {
-        dlp("replacing variable parsing error!\n");
-        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
-    }
-    
-    snprintf(query, QUERY_SIZE, "\
-            SELECT\
-                var_history.value\
-            FROM\
-                things_variablehistory var_history,\
-                things_variable var
-            WHERE\
-                var.identifier = '%s' and\
-                var_history.user_thing_id = %d and\
-                var_history.variable_id = var.id\
-            ORDER BY\
-                var_history.updated_at desc limit 1;", pszVariableName, nUserThingId);
-
-    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
-    ERRIFGOTO(result, _EXIT);
-
-    mysqlRow = mysql_fetch_row(pMysqlResult);
-    
-    if(mysqlRow == NULL){
-        dlp("There is no matching value yet!\n");
-        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
-    }
-
-    mysqlRow[0]
-
     result = ERR_CAP_NOERROR;
 _EXIT:
     SAFEMEMFREE(pszVariableName);
     SAFEMYSQLFREE(pMysqlResult);
     return result;
 }
-*/
 static cap_result checkDeviceWithId(IN MYSQL *pDBconn,IN cap_string strDeviceId) {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
