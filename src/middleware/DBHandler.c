@@ -17,7 +17,7 @@
 #include <json-c/json_object.h>
 
 #define MB 1024*1024
-#define MAX_ARGUMENT_SIZE 30 * MB
+#define MAX_ARGUMENT_SIZE MB
 
 #define QUERY_SIZE 1024*16
 #define NULL_ERROR -1
@@ -100,10 +100,17 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
     }
 }
 
+/*
+static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
+{
+    return ERR_CAP_NOERROR;
+}
+*/
+
 //Replace variable in string with actual variable
 //However, when variable does not exist, returns original string.
 //This is for a case where an user actually uses predefined delimeter in string ( ex. check items {{water, cup, etc}} )
-static cap_result replaceWithRealVariable(IN MYSQL *pDBconn,IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
+static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -703,7 +710,7 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
         //replaceWithRealVariable then add it to structure 
         result = replaceWithRealVariable(pDBconn, mysqlRow[1], &pszArgumentPayload);
         ERRIFGOTO(result, _EXIT);
-        
+
         result = CAPString_SetLow(pstActionContext->strArgumentPayload, pszArgumentPayload , CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
         

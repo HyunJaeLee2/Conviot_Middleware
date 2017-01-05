@@ -275,11 +275,12 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
     SAppManager *pstAppManager = NULL;
     const char* pszConstEcaId = "eca_id", *pszConstArguments = "arguments";
     //const char *pszConstName = "name", *pszConstValue = "value";
-    char *pszArgumentPayload = NULL, *pszFunctionName = NULL;
     char *pszPayload = NULL;
     int nPayloadLen;
+    int nLength = 0, nLoop = 0;
     cap_handle hActionList = NULL; 
-    
+    SActionContext *pstActionContext;
+
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     pstAppManager = (SAppManager *)hAppManager;
@@ -295,35 +296,44 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
     strTopic = CAPString_New();
     ERRMEMGOTO(strTopic, result, _EXIT);
 
-    result = CAPString_Set(strTopic, CAPSTR_REQUEST_FUNCTION);
+    result = CAPLinkedList_GetLength(hActionList, &nLength);
     ERRIFGOTO(result, _EXIT);
 
-    result = CAPString_AppendString(strTopic, strDeviceId);
-    ERRIFGOTO(result, _EXIT);
+    for(nLoop = 0; nLoop < nLength; nLoop++){
+        result = CAPLinkedList_Get(hActionList, LINKED_LIST_OFFSET_FIRST, nLoop, (void**)&pstActionContext);
+        ERRIFGOTO(result, _EXIT);
+
+        result = CAPString_Set(strTopic, CAPSTR_REQUEST_FUNCTION);
+        ERRIFGOTO(result, _EXIT);
+
+        result = CAPString_AppendString(strTopic, strDeviceId);
+        ERRIFGOTO(result, _EXIT);
+
+        result = CAPString_AppendString(strTopic, CAPSTR_TOPIC_SEPERATOR);
+        ERRIFGOTO(result, _EXIT);
     
-    result = CAPString_AppendString(strTopic, CAPSTR_TOPIC_SEPERATOR);
-    ERRIFGOTO(result, _EXIT);
-    
-    result = CAPString_AppendLow(strTopic, pszFunctionName, CAPSTRING_MAX);
-    ERRIFGOTO(result, _EXIT);
+        result = CAPString_AppendString(strTopic, pstActionContext->strFunctionName);
+        ERRIFGOTO(result, _EXIT);
 
-    pJsonObject = json_object_new_object();
-    ERRMEMGOTO(pJsonObject, result, _EXIT);
+        pJsonObject = json_object_new_object();
+        ERRMEMGOTO(pJsonObject, result, _EXIT);
 
-    //add eca id
-    json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
+        //add eca id
+        json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
 
-    //parse argument payload string to json object to add it to json
-    result = ParsingJson(&pJsonArgumentArray, pszArgumentPayload, strlen(pszArgumentPayload));
-    ERRIFGOTO(result, _EXIT);
+        //parse argument payload string to json object to add it to json
+        result = ParsingJson(&pJsonArgumentArray, CAPString_LowPtr(pstActionContext->strArgumentPayload, NULL),\
+                CAPString_Length(pstActionContext->strArgumentPayload));
+        ERRIFGOTO(result, _EXIT);
 
-    json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray); 
-  
-    pszPayload = strdup(json_object_to_json_string(pJsonObject));
-    nPayloadLen = strlen(pszPayload);
+        json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray); 
 
-    result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
-    ERRIFGOTO(result, _EXIT);
+        pszPayload = strdup(json_object_to_json_string(pJsonObject));
+        nPayloadLen = strlen(pszPayload);
+
+        result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
+        ERRIFGOTO(result, _EXIT);
+    }
 
     result = ERR_CAP_NOERROR;
 _EXIT:
