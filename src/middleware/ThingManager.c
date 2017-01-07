@@ -222,7 +222,8 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strDeviceId);
     ERRIFGOTO(result, _EXIT);
    
-    
+   
+    dlp("ThingManager received payload : %s\n", pszPayload);
     //Parse Payload to check its api key
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
     ERRIFGOTO(result, _EXIT);

@@ -333,7 +333,7 @@ cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, 
     }
 
     //if api key doesn't match
-    if(strncmp(pszApiKey, mysqlRow[0], strlen(mysqlRow[0])) != 0) {
+    if(strcmp(pszApiKey, mysqlRow[0]) != 0) {
         dlp("Api Key doesn't Match!!\n");
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }
@@ -383,7 +383,8 @@ cap_result DBHandler_RegisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceId,
             UPDATE\
                 things_device device\
             SET\
-                device.is_connected = 1\
+                device.is_connected = 1,\
+                device.updated_at = now()\
             where\
                 device.pin_code = '%s';", pszPinCode);
 
