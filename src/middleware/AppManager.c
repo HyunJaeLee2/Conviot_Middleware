@@ -54,6 +54,19 @@ static CALLBACK cap_result destroyRelatedCondtion(int nOffset, void* pData, void
 _EXIT:
     return result;
 }
+static CALLBACK cap_result destroySatisfiedEca(int nOffset, void* pData, void* pUsrData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    SConditionContext* pstConditionContext = NULL;
+
+    IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    SAFEMEMFREE(pData);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
 
 static CALLBACK cap_result destroyAction(int nOffset, void* pData, void* pUsrData)
 {
@@ -241,7 +254,13 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
 
         if(enOperator == OPERATOR_STRING_IS_EQUAL){
             //strcmp returns 0 when two strings are equal
-            bIsSatisfied = !(strcmp(pszOperand, pszVariable));
+            if(strcmp(pszOperand, pszVariable) == 0) {
+                bIsSatisfied = TRUE;
+            }
+            else {
+                bIsSatisfied = FALSE;
+            }
+
         }
         else if(enOperator == OPERATOR_STRING_CONTAINS) {
             char *pszResult = strstr(pszVariable, pszOperand);
@@ -333,6 +352,8 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
 
         result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
         ERRIFGOTO(result, _EXIT);
+
+        SAFEMEMFREE(pszPayload);
     }
 
     result = ERR_CAP_NOERROR;
@@ -345,7 +366,7 @@ _EXIT:
     return result;
 }
 
-static cap_result computeRelatedConditionList(cap_handle hRelatedConditionList, char *pszVariable, IN cap_string strDeviceId, cap_handle hAppManager)
+static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedConditionList, char *pszVariable, IN cap_string strDeviceId, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SConditionContext* pstConditionContext = NULL;
@@ -471,13 +492,6 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
         json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
     }
 
-    /*
-    if( CAPString_Length(strErrorString) > 0)
-    {
-        json_object_object_add(pJsonObject, "error_string", json_object_new_string(CAPString_LowPtr(strErrorString, NULL)));
-    }
-    */
-
     pszPayload = strdup(json_object_to_json_string(pJsonObject));
     nPayloadLen = strlen(pszPayload);
 
@@ -508,7 +522,7 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     ERRIFGOTO(result, _EXIT);
 
     //Compute Each condition -> if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
-    result = computeRelatedConditionList(hRelatedConditionList, pszVariable, strDeviceId, (cap_handle)pstAppManager );
+    result = computeConditionsThenActuateIfPossible(hRelatedConditionList, pszVariable, strDeviceId, (cap_handle)pstAppManager );
     ERRIFGOTO(result, _EXIT);
 
     //push is_satisfied of each condition into db(if there is only one condition or operator 'any' condition, this step will be ignored)
@@ -529,6 +543,7 @@ _EXIT:
     }
 
     CAPLinkedList_Traverse(hRelatedConditionList, destroyRelatedCondtion, NULL);
+    CAPLinkedList_Traverse(hSatisfiedEcaList, destroySatisfiedEca, NULL);
     CAPLinkedList_Destroy(&hRelatedConditionList);
     CAPLinkedList_Destroy(&hSatisfiedEcaList);
     return result;

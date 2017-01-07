@@ -153,7 +153,7 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumen
             strncpy(pszUserArgument, pszArgumentPayload + nUserArgHead, nUserArgTail - nUserArgHead + 1);
            
             //tokenize string with delimeter
-            pszUserThingId = strtok_r(pszUserArgument, "#", &pszVariableName);
+            pszUserThingId = strtok_r(pszUserArgument, "#", &pszVariableName); //TODO trim pszVariableName later
             nUserThingId = atoi(pszUserThingId);
 
             //Get latest value of request
@@ -170,6 +170,7 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumen
                     ORDER BY\
                         var_history.updated_at desc limit 1;", pszVariableName, nUserThingId);
 
+            dlp("history query : %s\n", query);
             result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
             ERRIFGOTO(result, _EXIT);
 
@@ -332,7 +333,7 @@ cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, 
     }
 
     //if api key doesn't match
-    if(strncmp(pszApiKey, mysqlRow[0], strlen(pszApiKey)) != 0) {
+    if(strncmp(pszApiKey, mysqlRow[0], strlen(mysqlRow[0])) != 0) {
         dlp("Api Key doesn't Match!!\n");
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }
@@ -623,7 +624,7 @@ cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDevic
         if(strncmp(mysqlRow[3], "all", 3) == 0){
             pstConditionContext->enEcaOp = OPERATOR_AND;
         }
-        else if(strncmp(mysqlRow[3], "any", 2) == 0){
+        else if(strncmp(mysqlRow[3], "any", 3) == 0){
             pstConditionContext->enEcaOp = OPERATOR_OR;
         }
         else {
@@ -654,9 +655,11 @@ cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDevic
 
         //check if there is only one condition in eca
         if(strncmp(mysqlRow[5], "1", 1) == 0){
+            dlp("is a single condition\n");
             pstConditionContext->bIsSingleCondition = TRUE;
         }
         else {
+            dlp("not a single condition\n");
             pstConditionContext->bIsSingleCondition = FALSE;
         }
         
@@ -734,6 +737,7 @@ cap_result DBHandler_RetrieveSatisfiedEcaList(IN MYSQL *pDBconn, IN OUT cap_hand
     MYSQL_ROW mysqlRow;
     int nRowCount = 0;
 
+    //Retrieve all eca where all conditions are satisfied 
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 eca.id\
@@ -755,9 +759,21 @@ cap_result DBHandler_RetrieveSatisfiedEcaList(IN MYSQL *pDBconn, IN OUT cap_hand
 
     while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
     {
-        int nSatisfiedEca = atoiIgnoreNull(mysqlRow[0]);
+        int *pnSatisfiedEca = (int *)malloc(sizeof(int));
+        *pnSatisfiedEca = atoiIgnoreNull(mysqlRow[0]);
 
-        result = CAPLinkedList_Add(hSatisfiedEcaList, LINKED_LIST_OFFSET_LAST, 0, (void *)&nSatisfiedEca);
+        result = CAPLinkedList_Add(hSatisfiedEcaList, LINKED_LIST_OFFSET_LAST, 0, (void *)pnSatisfiedEca);
+        ERRIFGOTO(result, _EXIT);
+
+        //make is_satisfied to false of related satisfied condition, once added to satisfied eca list
+        snprintf(query, QUERY_SIZE, "\
+                UPDATE\
+                    things_condition cond\
+                SET\
+                    cond.is_satisfied = 0\
+                WHERE\
+                   cond.event_condition_action_id = %d;", *pnSatisfiedEca);
+        result = callQuery(pDBconn, query);
         ERRIFGOTO(result, _EXIT);
     }
 
@@ -792,12 +808,11 @@ cap_result DBHandler_InsertSatisfiedCondition(IN MYSQL *pDBconn, IN cap_handle h
             else {
                 snprintf(query, QUERY_SIZE, "\
                         UPDATE\
-                            things_condition condition\
+                            things_condition cond\
                         SET\
-                            condition.is_satisfied = 1\
+                            cond.is_satisfied = 1\
                         where\
-                            condition.id = %d;", pstConditionContext->nConditionId);
-                
+                            cond.id = %d;", pstConditionContext->nConditionId);
                 result = callQuery(pDBconn, query);
                 ERRIFGOTO(result, _EXIT);
             }
