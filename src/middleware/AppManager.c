@@ -299,6 +299,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
     int nLength = 0, nLoop = 0;
     cap_handle hActionList = NULL; 
     SActionContext *pstActionContext;
+    char *pszApiKey = NULL;
 
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
@@ -340,19 +341,34 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         //add eca id
         json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
 
-        //parse argument payload string to json object to add it to json
-        result = ParsingJson(&pJsonArgumentArray, CAPString_LowPtr(pstActionContext->strArgumentPayload, NULL),\
-                CAPString_Length(pstActionContext->strArgumentPayload));
+        //add api key
+        result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
         ERRIFGOTO(result, _EXIT);
 
-        json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray); 
+        if(pszApiKey == NULL) {
+            //do nothing
+        } 
+        else {
+            json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
+        }
 
+        //Add Argument json only if there exists one
+        if(pstActionContext->strArgumentPayload != NULL)
+        {
+            //parse argument payload string to json object to add it to json
+            result = ParsingJson(&pJsonArgumentArray, CAPString_LowPtr(pstActionContext->strArgumentPayload, NULL),\
+                    CAPString_Length(pstActionContext->strArgumentPayload));
+            ERRIFGOTO(result, _EXIT);
+
+            json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray); 
+        }
         pszPayload = strdup(json_object_to_json_string(pJsonObject));
         nPayloadLen = strlen(pszPayload);
 
         result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
         ERRIFGOTO(result, _EXIT);
-
+        
+        SAFEMEMFREE(pszApiKey);
         SAFEMEMFREE(pszPayload);
     }
 
@@ -360,6 +376,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
 _EXIT:
     SAFEJSONFREE(pJsonObject);
     SAFEMEMFREE(pszPayload);
+    SAFEMEMFREE(pszApiKey);
     SAFE_CAPSTRING_DELETE(strTopic);
     CAPLinkedList_Traverse(hActionList, destroyAction, NULL);
     CAPLinkedList_Destroy(&hActionList);
@@ -444,7 +461,7 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     cap_string strTopic = NULL;
     char* pszPayload = NULL;
     int nPayloadLen = 0;
-    EMqttErrorCode enError;
+    EConviotErrorCode enError;
     char *pszApiKey = NULL;
     json_object* pJsonObject;
 
@@ -466,16 +483,16 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
 
     //make error code depend on result value
     if (errorCode == ERR_CAP_NOERROR) {
-        enError = ERR_MQTT_NOERROR;
+        enError = ERR_CONVIOT_NOERROR;
     }
     else if (errorCode == ERR_CAP_DUPLICATED) {
-        enError = ERR_MQTT_DUPLICATED;
+        enError = ERR_CONVIOT_DUPLICATED;
     }
     else if (errorCode == ERR_CAP_INVALID_DATA) {
-        enError = ERR_MQTT_INVALID_REQUEST;
+        enError = ERR_CONVIOT_INVALID_REQUEST;
     }
     else {
-        enError = ERR_MQTT_FAIL;
+        enError = ERR_CONVIOT_FAIL;
     }
 
     //set payload
@@ -570,6 +587,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     /*Topics are set as follow
      *[TM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
      */
+    dlp("AppManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL),pszPayload);
 
     //Get Category
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
@@ -623,12 +641,10 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
         int nErrorCode = 0, nEcaId = 0;
 
-        /*
         //If api key error has occured, goto exit 
         if(result_save != ERR_CAP_NOERROR){
-        goto _EXIT;
+            goto _EXIT;
         }
-        */
 
         if (!json_object_object_get_ex(pJsonObject, pszConstEcaId, &pJsonTemp)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);

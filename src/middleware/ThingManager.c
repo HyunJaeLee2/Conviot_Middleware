@@ -135,7 +135,7 @@ static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hTh
     char* pszPayload;
     char *pszApiKey = NULL;
     int nPayloadLen = 0;
-    EMqttErrorCode enError;
+    EConviotErrorCode enError;
     json_object* pJsonObject;
 
     IFVARERRASSIGNGOTO(hThingManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
@@ -155,16 +155,16 @@ static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hTh
 
     //make error code depend on errorcode value
     if (errorCode == ERR_CAP_NOERROR) {
-        enError = ERR_MQTT_NOERROR;
+        enError = ERR_CONVIOT_NOERROR;
     }
     else if (errorCode == ERR_CAP_DUPLICATED) {
-        enError = ERR_MQTT_DUPLICATED;
+        enError = ERR_CONVIOT_DUPLICATED;
     }
     else if (errorCode == ERR_CAP_INVALID_DATA) {
-        enError = ERR_MQTT_INVALID_REQUEST;
+        enError = ERR_CONVIOT_INVALID_REQUEST;
     }
     else {
-        enError = ERR_MQTT_FAIL;
+        enError = ERR_CONVIOT_FAIL;
     }
     
     //set payload
@@ -191,6 +191,7 @@ static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hTh
 _EXIT:
     SAFEJSONFREE(pJsonObject);
     SAFEMEMFREE(pszPayload);
+    SAFEMEMFREE(pszApiKey);
     SAFE_CAPSTRING_DELETE(strTopic);
 
     return result;
@@ -223,7 +224,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     ERRIFGOTO(result, _EXIT);
    
    
-    dlp("ThingManager received payload : %s\n", pszPayload);
+    dlp("ThingManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL),pszPayload);
     //Parse Payload to check its api key
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
     ERRIFGOTO(result, _EXIT);
@@ -256,14 +257,12 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
 
-        //If register error has occured, publish error code then return
+        //publish error code of function result
         result_save = DBHandler_RegisterDevice(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
-        if(result_save != ERR_CAP_NOERROR){
-            result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
-            ERRIFGOTO(result, _EXIT);
+        
+        result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
+        ERRIFGOTO(result, _EXIT);
 
-            goto _EXIT;
-        }
         
         /*
         if(result_save == ERR_CAP_NOERROR){
@@ -292,14 +291,12 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
 
-        //If register error has occured, publish error code then return
+        //publish error code of function result
         result_save = DBHandler_UnregisterDevice(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
-        if(result_save != ERR_CAP_NOERROR){
-            result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
-            ERRIFGOTO(result, _EXIT);
+        
+        result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
+        ERRIFGOTO(result, _EXIT);
 
-            goto _EXIT;
-        }
         
         /*
         result = disableDependentScenario(strDeviceId, pstThingManager->hAppEngine);

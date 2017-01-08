@@ -100,13 +100,6 @@ static int atoiIgnoreNull(const char* pszMysqlResult){
     }
 }
 
-/*
-static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumentPayload, OUT char **ppszFinalArgumentPayload)
-{
-    return ERR_CAP_NOERROR;
-}
-*/
-
 //Replace variable in string with actual variable
 //However, when variable does not exist, returns original string.
 //This is for a case where an user actually uses predefined delimeter in string ( ex. check items {{water, cup, etc}} )
@@ -170,7 +163,6 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumen
                     ORDER BY\
                         var_history.updated_at desc limit 1;", pszVariableName, nUserThingId);
 
-            dlp("history query : %s\n", query);
             result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
             ERRIFGOTO(result, _EXIT);
 
@@ -276,7 +268,7 @@ cap_result DBHandler_RetrieveApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId
             WHERE\
                 device.device_id = '%s' and\
                 userthing.id = device.user_thing_id and\
-                product.id = device.user_thing_id and\
+                product.id = userthing.product_id and\
                 vendor.id = product.vendor_id;", CAPString_LowPtr(strDeviceId, NULL));
 
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
@@ -318,7 +310,7 @@ cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, 
             WHERE\
                 device.device_id = '%s' and\
                 userthing.id = device.user_thing_id and\
-                product.id = device.user_thing_id and\
+                product.id = userthing.product_id and\
                 vendor.id = product.vendor_id;", CAPString_LowPtr(strDeviceId, NULL));
 
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
@@ -475,6 +467,7 @@ cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDe
                 userthing.id = device.user_thing_id and\
                 variable.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
     
+    
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -490,11 +483,21 @@ cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDe
         nCustomerId = atoiIgnoreNull(mysqlRow[1]);
         nVariableId = atoiIgnoreNull(mysqlRow[2]);
     }
-    
-    snprintf(query, QUERY_SIZE, "\
-            INSERT INTO\
+   
+    //If custumor hasn't connected their device with pin code, device's customer id is set as null
+    if(nCustomerId == NULL_ERROR) {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_variablehistory(created_at, updated_at, user_thing_id, variable_id, value)\
+                VALUES(now(), now(), %d, %d, %s);", nUserThingId, nVariableId, pszVariable);
+        
+    }
+    else {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
                 things_variablehistory(created_at, updated_at, customer_id, user_thing_id, variable_id, value)\
-            VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nUserThingId, nVariableId, pszVariable);
+                VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nUserThingId, nVariableId, pszVariable);
+    }
 
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
@@ -704,24 +707,33 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
         pstActionContext->strFunctionName = CAPString_New();
         ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
         
-        pstActionContext->strArgumentPayload = CAPString_New();
-        ERRMEMGOTO(pstActionContext->strArgumentPayload, result, _EXIT);
-        
         result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
 
         //TODO
-        //replaceWithRealVariable then add it to structure 
-        result = replaceWithRealVariable(pDBconn, mysqlRow[1], &pszArgumentPayload);
-        ERRIFGOTO(result, _EXIT);
+        //Handle if argument is null
 
-        result = CAPString_SetLow(pstActionContext->strArgumentPayload, pszArgumentPayload , CAPSTRING_MAX);
-        ERRIFGOTO(result, _EXIT);
+        if(mysqlRow[1] != NULL){
+            pstActionContext->strArgumentPayload = CAPString_New();
+            ERRMEMGOTO(pstActionContext->strArgumentPayload, result, _EXIT);
+        
+            //replaceWithRealVariable then add it to structure 
+            result = replaceWithRealVariable(pDBconn, mysqlRow[1], &pszArgumentPayload);
+            ERRIFGOTO(result, _EXIT);
+
+            result = CAPString_SetLow(pstActionContext->strArgumentPayload, pszArgumentPayload , CAPSTRING_MAX);
+            ERRIFGOTO(result, _EXIT);
+
+            SAFEMEMFREE(pszArgumentPayload);
+        }
+        else {
+            //if there is no argument, set payload as null
+            pstActionContext->strArgumentPayload = NULL;
+        }
         
         result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);
         ERRIFGOTO(result, _EXIT);
 
-        SAFEMEMFREE(pszArgumentPayload);
     }
 
     result = ERR_CAP_NOERROR;

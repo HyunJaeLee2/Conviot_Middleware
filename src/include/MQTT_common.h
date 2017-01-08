@@ -4,13 +4,16 @@
 #include "capiot_common.h"
 #include "CAPString.h"
 
-typedef enum _EMqttErrorCode {
-	ERR_MQTT_NOERROR         = 0,
-	ERR_MQTT_FAIL            = -1,
-	ERR_MQTT_DUPLICATED      = -4,
-	ERR_MQTT_NOT_SUPPORTED   = -5,
-	ERR_MQTT_INVALID_REQUEST = -7,
-} EMqttErrorCode;
+typedef enum _EConviotErrorCode {
+	ERR_CONVIOT_NOERROR         = 0,
+	ERR_CONVIOT_FAIL            = -1,
+	ERR_CONVIOT_TIME_EXPIRED    = -2,
+	ERR_CONVIOT_INVALID_PARAM   = -3,
+	ERR_CONVIOT_DUPLICATED      = -4,
+	ERR_CONVIOT_NOT_SUPPORTED   = -5,
+	ERR_CONVIOT_INTERNAL_FAIL   = -6,
+	ERR_CONVIOT_INVALID_REQUEST = -7,
+} EConviotErrorCode;
 
 typedef struct _SMQTTData{
     char* pszTopic;
