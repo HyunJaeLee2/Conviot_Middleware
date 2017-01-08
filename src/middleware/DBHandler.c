@@ -126,7 +126,7 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumen
         else if(pszArgumentPayload[nArgIndex] == '{' && pszArgumentPayload[nArgIndex + 1] == '{') {
             int nLoop = 0;
             char *pszUserArgument = NULL, *pszUserThingId = NULL, *pszVariableName = NULL;
-            int nUserThingId = 0, nLatestValueLen = 0;
+            int nUserThingId = 0, nLatestValueLen = 0, nUserArgLen = 0;
 
             //Each of nUserArgHead and nUserArgTail points to the start and the end of user arugument
             nUserArgHead = nArgIndex + 2;
@@ -138,12 +138,14 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumen
                     break;
                 } 
             }
-
-            //Allocate memory for user argument with size including null at the end
-            pszUserArgument = (char *)malloc(sizeof(char) * (nUserArgTail - nUserArgHead + 2));
             
+            nUserArgLen = nUserArgTail - nUserArgHead + 1;
+            //Allocate memory for user argument with size including null at the end
+            pszUserArgument = (char *)malloc(sizeof(char) * (nUserArgLen + 1));
+
             //copy user argument from argument payload
-            strncpy(pszUserArgument, pszArgumentPayload + nUserArgHead, nUserArgTail - nUserArgHead + 1);
+            strncpy(pszUserArgument, pszArgumentPayload + nUserArgHead, nUserArgLen);
+            pszUserArgument[nUserArgLen] = '\0';
            
             //tokenize string with delimeter
             pszUserThingId = strtok_r(pszUserArgument, "#", &pszVariableName); //TODO trim pszVariableName later

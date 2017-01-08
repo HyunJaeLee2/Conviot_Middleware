@@ -341,6 +341,9 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         //add eca id
         json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
 
+        //TODO
+        //replace strDeviceId with actual device id from database
+        
         //add api key
         result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
         ERRIFGOTO(result, _EXIT);
