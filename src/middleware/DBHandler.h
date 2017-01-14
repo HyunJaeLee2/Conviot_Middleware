@@ -29,6 +29,10 @@ cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDevic
 cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList);
 cap_result DBHandler_RetrieveSatisfiedEcaList(IN MYSQL *pDBconn, IN OUT cap_handle hSatisfiedEcaList);
 cap_result DBHandler_InsertSatisfiedCondition(IN MYSQL *pDBconn, IN cap_handle hRelatedConditionList);
+
+cap_result DBHandler_MakeThingAliveInfoArray(IN MYSQL *pDBconn, IN OUT SThingAliveInfo **ppstThingAliveInfoArray, IN int *pnArrayLength);
+cap_result DBHandler_DisableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDeviceId); 
+
 #ifdef __cplusplus
 }
 #endif

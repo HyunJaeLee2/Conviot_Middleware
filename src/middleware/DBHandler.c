@@ -392,6 +392,65 @@ _EXIT:
 
 }
 
+cap_result DBHandler_DisableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDeviceId)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    
+    //disable device
+    snprintf(query, QUERY_SIZE, "\
+            UPDATE\
+                things_device device\
+            SET\
+                device.is_connected = 0\
+            where\
+                device.device_id = '%s'", CAPString_LowPtr(strDeviceId, NULL));
+    
+    result = callQuery(pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+   
+    //disable condition related eca
+    snprintf(query, QUERY_SIZE, "\
+            UPDATE\
+                things_device device,\
+                things_eventconditionaction eca,\
+                things_userthing userthing,\
+                things_condition cond\
+            SET\
+                eca.usable = 0\
+            where\
+                device.device_id = '%s' and\
+                userthing.id = device.user_thing_id and\
+                cond.user_thing_id = userthing.id and\
+                eca.id = cond.event_condition_action_id;", CAPString_LowPtr(strDeviceId, NULL));
+    
+    result = callQuery(pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+    
+    //disable action related eca
+    snprintf(query, QUERY_SIZE, "\
+            UPDATE\
+                things_device device,\
+                things_eventconditionaction eca,\
+                things_userthing userthing,\
+                things_action action_\
+            SET\
+                eca.usable = 0\
+            where\
+                device.device_id = '%s' and\
+                userthing.id = device.user_thing_id and\
+                action_.user_thing_id = userthing.id and\
+                eca.id = action_.event_condition_action_id;", CAPString_LowPtr(strDeviceId, NULL));
+    
+    result = callQuery(pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+
+}
+
 cap_result DBHandler_UnregisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN char *pszPinCode)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -840,6 +899,93 @@ _EXIT:
 }
 
 
+cap_result DBHandler_MakeThingAliveInfoArray(IN MYSQL *pDBconn, IN OUT SThingAliveInfo **ppstThingAliveInfoArray, IN int *pnArrayLength)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    int nLoop = 0;
+    int nArrayNum = 0;
+    SThingAliveInfo *pstThingAliveInfoArray = NULL;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                COUNT(*)\
+            FROM\
+                things_device device\
+            WHERE\
+                device.is_connected = 1;");
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no device 
+    if(mysqlRow == NULL){
+        dlp("There is no registered device at the time\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+    else {
+        nArrayNum = atoiIgnoreNull(mysqlRow[0]);
+    } 
+    SAFEMYSQLFREE(pMysqlResult);
+
+    //Allocate Memory to Array
+    pstThingAliveInfoArray = (SThingAliveInfo*)calloc(nArrayNum, sizeof(SThingAliveInfo));
+    ERRMEMGOTO(pstThingAliveInfoArray, result, _EXIT);
+    
+    for (nLoop = 0; nLoop < nArrayNum; nLoop++)
+    {
+        pstThingAliveInfoArray[nLoop].strDeviceId = NULL;
+    }
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                device.device_id,\
+                product.alive_cycle,\
+                UNIX_TIMESTAMP(device.updated_at)\
+            FROM\
+                things_device device,\
+                things_product product,\
+                things_userthing userthing\
+            WHERE\
+                device.is_connected = 1 and\
+                device.user_thing_id = userthing.id and\
+                userthing.product_id = product.id;");
+    
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    //Make Thing Alive Array
+    for (nLoop = 0; (mysqlRow = mysql_fetch_row(pMysqlResult)) ; nLoop++) {
+        if(nLoop >= nArrayNum){
+            ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
+        }
+        
+        pstThingAliveInfoArray[nLoop].strDeviceId = CAPString_New();
+        ERRMEMGOTO(pstThingAliveInfoArray[nLoop].strDeviceId, result, _EXIT);
+
+        result = CAPString_SetLow(pstThingAliveInfoArray[nLoop].strDeviceId, (const char *)mysqlRow[0], CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
+        pstThingAliveInfoArray[nLoop].nAliveCycle = atoiIgnoreNull(mysqlRow[1]);
+
+        if(mysqlRow[2] != NULL){
+            pstThingAliveInfoArray[nLoop].llLatestTime =(long long) (atof(mysqlRow[2]) * 1000); //convert second to millisecond
+        }
+    }
+
+    *ppstThingAliveInfoArray = pstThingAliveInfoArray;
+    *pnArrayLength = nArrayNum;
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
 
 
 

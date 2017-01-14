@@ -60,7 +60,7 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
     long long llCurrTime = 0;
     long long llLatestTime = 0;
     long long llAliveCycle = 0;
-
+    
 	IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
 	pstThingManager = (SThingManager *)pUserData;
@@ -76,33 +76,26 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
 		}
 		ERRIFGOTO(result, _EXIT);
 
-        /*
-        result = DBHandler_MakeThingAliveInfoArray(&pstThingManager->pstThingAliveInfoArray, &nArrayLength);
+        result = DBHandler_MakeThingAliveInfoArray(pstThingManager->pDBconn, &pstThingManager->pstThingAliveInfoArray, &nArrayLength);
         ERRIFGOTO(result, _EXIT);
-        */
 
         //If there is no thing in database, continue
         if(pstThingManager->pstThingAliveInfoArray == NULL)
             continue;
-
+        
+        result = CAPTime_GetCurTimeInMilliSeconds(&llCurrTime);
+        ERRIFGOTO(result, _EXIT);
+           
         for(nLoop = 0; nLoop < nArrayLength; nLoop++){
             llLatestTime = pstThingManager->pstThingAliveInfoArray[nLoop].llLatestTime;
-            
             //Minor Adjustment to alive cycle considering network overhead
             llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].nAliveCycle * 1000 + 1 * SECOND;
-
-            result = CAPTime_GetCurTimeInMilliSeconds(&llCurrTime);
-            ERRIFGOTO(result, _EXIT);
-           
+            
             if(llCurrTime - llLatestTime > llAliveCycle){
-                /*
-                //TODO
-                //disable scenarios
-                result = DBHandler_DeleteThing(pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);
+                result = DBHandler_DisableDeviceAndEca(pstThingManager->pDBconn, pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);  
                 ERRIFGOTO(result, _EXIT);
-                */
 
-                CAPLogger_Write(g_hLogger, MSG_INFO, "ThingManager has unregistered %s for not receiving alive message.",\
+                CAPLogger_Write(g_hLogger, MSG_INFO, "ThingManager has disabled %s and removed related ECAs for not receiving alive message.",\
                         CAPString_LowPtr(pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId, NULL));
             }
         }
