@@ -162,11 +162,39 @@ int main(int argc, char* argv[])
     SDBInfo *pstDBInfo = NULL;
     cap_result result = ERR_CAP_UNKNOWN;
 	cap_string strLogPrefix = NULL;
+	cap_bool d_opt = FALSE;
+	cap_bool f_opt = FALSE;
+	char* config_file = NULL;
+	int opt;
+	int optnum = 0;
 
-    if(argc != 2){
-        fprintf(stderr, "Usage : ./cap_iot_middleware [PATH_OF_CONFIGURATION_FILE]\n");
-        return -1;
-    }
+	opterr = 0;
+	while((opt = getopt(argc, argv, "df:")) != -1) 
+	{
+		optnum++;
+		switch(opt) 
+		{ 
+			case 'd':
+				d_opt = TRUE;
+				break; 
+			case 'f':
+				f_opt = TRUE;
+				config_file = optarg;
+				optnum++;
+				break;
+			case '?':		//in the case of unknown options
+				printf("Usage: conviot_middleware [-d] [-f configure_file_path]\n");
+				return -1;
+		} 
+	}
+	if( (argc > 1) && (optnum == 0)){	//with argvs without '-'  ex)./conviot_middleware argv
+		printf("Usage: conviot_middleware [-d] [-f configure_file]\n");
+		return -1;
+	}
+
+	if( f_opt == FALSE ){
+		config_file = "middleware_config.cfg";
+	}
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -178,8 +206,14 @@ int main(int argc, char* argv[])
 
     pstConfigData->pstDBInfo = pstDBInfo;
 
-    result = getConfigData(pstConfigData, argv[1]);
+    result = getConfigData(pstConfigData, config_file);
 	ERRIFGOTO(result, _EXIT);
+	
+    if(d_opt == TRUE){
+		if(daemon(0,0) == -1){	// demonize a program and is included in unistd.h
+			return -1;
+		}
+	}
 
 	strLogPrefix = CAPString_New();
 	ERRMEMGOTO(strLogPrefix, result, _EXIT);
