@@ -560,7 +560,6 @@ cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDe
                 VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
     }
 
-    dlp("query : %s\n", query);
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
@@ -773,10 +772,8 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
         result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
 
-        //TODO
         //Handle if argument is null
-
-        if(mysqlRow[1] != NULL){
+        if(mysqlRow[1] != NULL && ( strcmp("null", mysqlRow[1]) != 0 ) ){
             pstActionContext->strArgumentPayload = CAPString_New();
             ERRMEMGOTO(pstActionContext->strArgumentPayload, result, _EXIT);
         
