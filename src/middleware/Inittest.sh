@@ -1,1 +1,1 @@
-./conviot_middleware middleware_config.cfg
+./conviot_middleware -f middleware_config.cfg

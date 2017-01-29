@@ -405,7 +405,7 @@ cap_result DBHandler_DisableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDevi
                 device.is_connected = 0\
             where\
                 device.device_id = '%s'", CAPString_LowPtr(strDeviceId, NULL));
-    
+   
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
    
@@ -664,6 +664,7 @@ cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDevic
                 variable.identifier = '%s' and \
                 userthing.id = device.user_thing_id and\
                 eca.customer_id = userthing.customer_id  and\
+                eca.usable = 1 and\
                 cond.user_thing_id = device.user_thing_id and\
                 cond.variable_id = variable.id and\
                 cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
