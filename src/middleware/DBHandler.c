@@ -752,13 +752,21 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 function.identifier,\
-                action.arguments\
+                action.arguments,\
+                product.type,\
+                customer.user_id\
             FROM\
                 things_function function,\
-                things_action action\
+                things_action action,\
+                things_product product,\
+                things_userthing userthing,\
+                things_customer customer\
             WHERE\
                 action.event_condition_action_id = %d and\
-                function.id = action.function_id;", nEcaId);
+                function.id = action.function_id and\
+                function.product_id = product.id and\
+                action.user_thing_id = userthing.id and\
+                userthing.customer_id = customer.id;", nEcaId);
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -790,10 +798,18 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
             //if there is no argument, set payload as null
             pstActionContext->strArgumentPayload = NULL;
         }
+
+        if(strcmp("thing", mysqlRow[2]) == 0){
+            pstActionContext->bIsServiceType = 0;
+        }
+        else{
+            pstActionContext->bIsServiceType = 1;
+        }
+
+        pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[3]); 
         
         result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);
         ERRIFGOTO(result, _EXIT);
-
     }
 
     result = ERR_CAP_NOERROR;

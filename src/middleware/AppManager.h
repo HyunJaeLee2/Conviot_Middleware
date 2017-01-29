@@ -36,6 +36,8 @@ typedef struct _SConditionContext {
 typedef struct _SActionContext {
     cap_string strFunctionName;	
     cap_string strArgumentPayload;	
+    cap_bool   bIsServiceType;
+    int        nUserId;
 } SActionContext;
 
 cap_result AppManager_Create(OUT cap_handle* phAppManager, cap_string strBrokerURI, IN SDBInfo *pstDBInfo);

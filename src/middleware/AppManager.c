@@ -33,7 +33,8 @@ CAPSTRING_CONST(CAPSTR_MQTT_CLIENT_ID, MQTT_CLIENT_ID);
 CAPSTRING_CONST(CAPSTR_CATEGORY_FUNCTION_RESULT, "FUNCTION_RESULT");
 CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
 
-CAPSTRING_CONST(CAPSTR_REQUEST_FUNCTION, "MT/REQUEST_FUNCTION/");
+CAPSTRING_CONST(CAPSTR_DEVICE_REQUEST_FUNCTION, "MT/REQUEST_FUNCTION/");
+CAPSTRING_CONST(CAPSTR_SERVICE_REQUEST_FUNCTION, "MS/REQUSET_FUNCTION/");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, TOPIC_SEPERATOR);
 
 CAPSTRING_CONST(CAPSTR_MT, "MT/");
@@ -312,7 +313,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
     ERRIFGOTO(result, _EXIT);
     
     //set topic
-    //Format : MT/REQUEST_FUNCTION/[Thing ID]/[Function name]
+    //Format : [MT|MS]/REQUEST_FUNCTION/[Thing ID]/[Function name]
     strTopic = CAPString_New();
     ERRMEMGOTO(strTopic, result, _EXIT);
 
@@ -323,7 +324,14 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         result = CAPLinkedList_Get(hActionList, LINKED_LIST_OFFSET_FIRST, nLoop, (void**)&pstActionContext);
         ERRIFGOTO(result, _EXIT);
 
-        result = CAPString_Set(strTopic, CAPSTR_REQUEST_FUNCTION);
+        if(pstActionContext->bIsServiceType)  
+        {   
+            result = CAPString_Set(strTopic, CAPSTR_SERVICE_REQUEST_FUNCTION);
+        }
+        else
+        {   
+            result = CAPString_Set(strTopic, CAPSTR_DEVICE_REQUEST_FUNCTION);
+        }
         ERRIFGOTO(result, _EXIT);
 
         result = CAPString_AppendString(strTopic, strDeviceId);
@@ -353,6 +361,12 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         } 
         else {
             json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
+        }
+
+        // Add user_id argument if action type is service
+        if(pstActionContext->bIsServiceType)
+        {
+            json_object_object_add(pJsonObject, "user_id", json_object_new_int(pstActionContext->nUserId));
         }
 
         //Add Argument json only if there exists one
