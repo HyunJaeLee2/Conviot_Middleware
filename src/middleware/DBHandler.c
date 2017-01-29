@@ -550,16 +550,17 @@ cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDe
         snprintf(query, QUERY_SIZE, "\
                 INSERT INTO\
                 things_variablehistory(created_at, updated_at, user_thing_id, variable_id, value)\
-                VALUES(now(), now(), %d, %d, %s);", nUserThingId, nVariableId, pszVariable);
+                VALUES(now(), now(), %d, %d, '%s');", nUserThingId, nVariableId, pszVariable);
         
     }
     else {
         snprintf(query, QUERY_SIZE, "\
                 INSERT INTO\
                 things_variablehistory(created_at, updated_at, customer_id, user_thing_id, variable_id, value)\
-                VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nUserThingId, nVariableId, pszVariable);
+                VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
     }
 
+    dlp("query : %s\n", query);
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
