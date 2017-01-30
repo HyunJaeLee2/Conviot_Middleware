@@ -78,6 +78,7 @@ static CALLBACK cap_result destroyAction(int nOffset, void* pData, void* pUsrDat
 
     pstActionContext = (SActionContext*)pData;
 
+	SAFE_CAPSTRING_DELETE(pstActionContext->strDeviceId);
 	SAFE_CAPSTRING_DELETE(pstActionContext->strFunctionName);
 	SAFE_CAPSTRING_DELETE(pstActionContext->strArgumentPayload);
     SAFEMEMFREE(pstActionContext);
@@ -334,7 +335,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         }
         ERRIFGOTO(result, _EXIT);
 
-        result = CAPString_AppendString(strTopic, strDeviceId);
+        result = CAPString_AppendString(strTopic, pstActionContext->strDeviceId);
         ERRIFGOTO(result, _EXIT);
 
         result = CAPString_AppendString(strTopic, CAPSTR_TOPIC_SEPERATOR);
@@ -353,7 +354,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         //replace strDeviceId with actual device id from database
         
         //add api key
-        result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
+        result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, pstActionContext->strDeviceId, &pszApiKey);
         ERRIFGOTO(result, _EXIT);
 
         if(pszApiKey == NULL) {

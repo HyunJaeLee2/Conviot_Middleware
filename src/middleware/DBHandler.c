@@ -754,11 +754,13 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
                 function.identifier,\
                 action.arguments,\
                 product.type,\
-                customer.user_id\
+                customer.user_id,\
+                device.device_id\ 
             FROM\
                 things_function function,\
                 things_action action,\
                 things_product product,\
+                things_device device,\
                 things_userthing userthing,\
                 things_customer customer\
             WHERE\
@@ -766,6 +768,7 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
                 function.id = action.function_id and\
                 function.product_id = product.id and\
                 action.user_thing_id = userthing.id and\
+                device.user_thing_id = userthing.id and\
                 userthing.customer_id = customer.id;", nEcaId);
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
@@ -773,7 +776,7 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
     while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
     {
         SActionContext *pstActionContext = (SActionContext*)calloc(1, sizeof(SActionContext));   
-    
+        
         pstActionContext->strFunctionName = CAPString_New();
         ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
         
@@ -808,6 +811,12 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
 
         pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[3]); 
         
+        pstActionContext->strDeviceId = CAPString_New();
+        ERRMEMGOTO(pstActionContext->strDeviceId, result, _EXIT);
+        
+        result = CAPString_SetLow(pstActionContext->strDeviceId, mysqlRow[4] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
         result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);
         ERRIFGOTO(result, _EXIT);
     }
