@@ -32,6 +32,7 @@ static char* paszThingManagerSubcriptionList[] = {
     "TM/UNREGISTER/#",
     "TM/ALIVE/#",
     "TM/SEND_VARIABLE/#",
+    "SM/SEND_VARIABLE/#",
 };
 
 
@@ -90,7 +91,8 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
             llLatestTime = pstThingManager->pstThingAliveInfoArray[nLoop].llLatestTime;
             //Minor Adjustment to alive cycle considering network overhead
             llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].llAliveCycle + 1 * SECOND;
-                
+               
+            dlp("curr : %lld, latest : %lld, alive : %lld, sub : %lld\n", llCurrTime, llLatestTime, llAliveCycle, llCurrTime- llLatestTime);
             if(llCurrTime - llLatestTime > llAliveCycle){
                 result = DBHandler_DisableDeviceAndEca(pstThingManager->pDBconn, pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);  
                 ERRIFGOTO(result, _EXIT);

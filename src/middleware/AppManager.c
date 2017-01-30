@@ -25,6 +25,8 @@
 static char* paszAppManagerSubcriptionList[] = {
     "TM/SEND_VARIABLE/#",
     "TM/FUNCTION_RESULT/#",
+    "SM/SEND_VARIABLE/#",
+    "SM/FUNCTION_RESULT/#",
 };
 
 
@@ -58,7 +60,6 @@ _EXIT:
 static CALLBACK cap_result destroySatisfiedEca(int nOffset, void* pData, void* pUsrData)
 {
     cap_result result = ERR_CAP_UNKNOWN;
-    SConditionContext* pstConditionContext = NULL;
 
     IFVARERRASSIGNGOTO(pData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
@@ -405,14 +406,11 @@ static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedCond
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SConditionContext* pstConditionContext = NULL;
-    SAppManager *pstAppManager = NULL;
     int nLength = 0;
     int nLoop = 0;
 
     IFVARERRASSIGNGOTO(hRelatedConditionList, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-    pstAppManager = (SAppManager *)hAppManager;
 
     result = CAPLinkedList_GetLength(hRelatedConditionList, &nLength);
     ERRIFGOTO(result, _EXIT);
@@ -442,14 +440,11 @@ _EXIT:
 static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, IN cap_string strDeviceId, cap_handle hAppManager) 
 {
     cap_result result = ERR_CAP_UNKNOWN;
-    SAppManager *pstAppManager = NULL;
     int nLength = 0, nLoop = 0;
     int *pnEcaId = NULL;
 
     IFVARERRASSIGNGOTO(hSatisfiedEcaList, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-    pstAppManager = (SAppManager *)hAppManager;
 
     result = CAPLinkedList_GetLength(hSatisfiedEcaList, &nLength);
     ERRIFGOTO(result, _EXIT);
@@ -644,7 +639,6 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
-
         //Get variable name 
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);

@@ -755,7 +755,8 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
                 action.arguments,\
                 product.type,\
                 customer.user_id,\
-                device.device_id\ 
+                device.device_id,\
+                product.identifier\
             FROM\
                 things_function function,\
                 things_action action,\
@@ -780,9 +781,6 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
         pstActionContext->strFunctionName = CAPString_New();
         ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
         
-        result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
-        ERRIFGOTO(result, _EXIT);
-
         //Handle if argument is null
         if(mysqlRow[1] != NULL && ( strcmp("null", mysqlRow[1]) != 0 ) ){
             pstActionContext->strArgumentPayload = CAPString_New();
@@ -802,11 +800,22 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
             pstActionContext->strArgumentPayload = NULL;
         }
 
+        //if it is a thing, set function name
         if(strcmp("thing", mysqlRow[2]) == 0){
             pstActionContext->bIsServiceType = 0;
+            
+            result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
+            ERRIFGOTO(result, _EXIT);
+
         }
+        //If it is a service, set product identifier as a function name
+        //TODO
+        //seperate function name and service name in function context
         else{
             pstActionContext->bIsServiceType = 1;
+            
+            result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[5] , CAPSTRING_MAX);
+            ERRIFGOTO(result, _EXIT);
         }
 
         pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[3]); 
