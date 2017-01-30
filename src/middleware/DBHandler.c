@@ -995,7 +995,7 @@ cap_result DBHandler_MakeThingAliveInfoArray(IN MYSQL *pDBconn, IN OUT SThingAli
         result = CAPString_SetLow(pstThingAliveInfoArray[nLoop].strDeviceId, (const char *)mysqlRow[0], CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
 
-        pstThingAliveInfoArray[nLoop].nAliveCycle = atoiIgnoreNull(mysqlRow[1]);
+        pstThingAliveInfoArray[nLoop].llAliveCycle = (long long)atoiIgnoreNull(mysqlRow[1]);
 
         if(mysqlRow[2] != NULL){
             pstThingAliveInfoArray[nLoop].llLatestTime =(long long) (atof(mysqlRow[2]) * 1000); //convert second to millisecond

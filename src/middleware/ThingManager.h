@@ -19,7 +19,7 @@ extern "C" {
 
 typedef struct _SThingAliveInfo {
     cap_string strDeviceId;
-    int nAliveCycle;
+    long long llAliveCycle;
     long long llLatestTime;
 } SThingAliveInfo;
 

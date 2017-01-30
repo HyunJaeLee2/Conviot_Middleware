@@ -89,7 +89,7 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
         for(nLoop = 0; nLoop < nArrayLength; nLoop++){
             llLatestTime = pstThingManager->pstThingAliveInfoArray[nLoop].llLatestTime;
             //Minor Adjustment to alive cycle considering network overhead
-            llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].nAliveCycle * 1000 + 1 * SECOND;
+            llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].llAliveCycle + 1 * SECOND;
                 
             if(llCurrTime - llLatestTime > llAliveCycle){
                 result = DBHandler_DisableDeviceAndEca(pstThingManager->pDBconn, pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);  
