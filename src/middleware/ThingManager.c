@@ -93,7 +93,7 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
             //Minor Adjustment to alive cycle considering network overhead
             llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].llAliveCycle + 1 * SECOND;
                
-            //dlp("curr : %lld, latest : %lld, alive : %lld, sub : %lld\n", llCurrTime, llLatestTime, llAliveCycle, llCurrTime- llLatestTime);
+           //dlp("curr : %lld, latest : %lld, alive : %lld, sub : %lld\n", llCurrTime, llLatestTime, llAliveCycle, llCurrTime- llLatestTime);
             if(llCurrTime - llLatestTime > llAliveCycle){
                 result = DBHandler_DisableDeviceAndEca(pstThingManager->pDBconn, pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);  
                 ERRIFGOTO(result, _EXIT);
@@ -141,9 +141,6 @@ static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_st
     strFilePath = CAPString_New();
     ERRMEMGOTO(strFilePath, result, _EXIT);
     
-    strBinaryDBPath = CAPString_New();
-    ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
-    
     result = CAPString_PrintFormat(strFilePath, "%s/%s_%s_%lu", pszConstFilePathPrefix, CAPString_LowPtr(strDeviceId, NULL), \
             CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL));
     ERRIFGOTO(result, _EXIT);
@@ -154,14 +151,18 @@ static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_st
 
     result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
     ERRIFGOTO(result, _EXIT);
-    
-    if( (pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb")) ) {
+   
+    dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
+    pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
+    if(pFile == NULL) {
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }      
 
     fwrite(pszDecodedData, nDecodedLen, 1, pFile);
 
     fclose(pFile);
+
+    SAFE_CAPSTRING_DELETE(strFilePath);
 
     result = ERR_CAP_NOERROR;
 _EXIT:

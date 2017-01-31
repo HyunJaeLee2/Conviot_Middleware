@@ -560,6 +560,7 @@ cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDe
                 VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
     }
 
+    dlp("query : %s\n", query);
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
