@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include <CAPBase64.h>
 #include <CAPString.h>
 #include <CAPThread.h>
 #include <CAPQueue.h>
@@ -92,7 +93,7 @@ CAP_THREAD_HEAD aliveHandlingThread(IN void* pUserData)
             //Minor Adjustment to alive cycle considering network overhead
             llAliveCycle = pstThingManager->pstThingAliveInfoArray[nLoop].llAliveCycle + 1 * SECOND;
                
-            dlp("curr : %lld, latest : %lld, alive : %lld, sub : %lld\n", llCurrTime, llLatestTime, llAliveCycle, llCurrTime- llLatestTime);
+            //dlp("curr : %lld, latest : %lld, alive : %lld, sub : %lld\n", llCurrTime, llLatestTime, llAliveCycle, llCurrTime- llLatestTime);
             if(llCurrTime - llLatestTime > llAliveCycle){
                 result = DBHandler_DisableDeviceAndEca(pstThingManager->pDBconn, pstThingManager->pstThingAliveInfoArray[nLoop].strDeviceId);  
                 ERRIFGOTO(result, _EXIT);
@@ -120,6 +121,51 @@ _EXIT:
     }
 
     CAP_THREAD_END;
+}
+
+/*
+ -Get file path from config file
+ -write binary then save it into db
+*/
+static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, OUT cap_string strBinaryDBPath)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    FILE* pFile = NULL;
+    //TODO : set path prefix in config file
+    const char *pszConstFilePathPrefix = "/var/www/Conviot/static/repository";
+    const char *pszConstDBPathPrefix = "http://www.conviot.com/static/repository";
+    cap_string strFilePath = NULL;
+    char *pszDecodedData = NULL;
+    int nDecodedLen = 0;
+
+    strFilePath = CAPString_New();
+    ERRMEMGOTO(strFilePath, result, _EXIT);
+    
+    strBinaryDBPath = CAPString_New();
+    ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
+    
+    result = CAPString_PrintFormat(strFilePath, "%s/%s_%s_%lu", pszConstFilePathPrefix, CAPString_LowPtr(strDeviceId, NULL), \
+            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL));
+    ERRIFGOTO(result, _EXIT);
+    
+    result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%s_%lu", pszConstDBPathPrefix,  CAPString_LowPtr(strDeviceId, NULL), \
+            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL));
+    ERRIFGOTO(result, _EXIT);
+
+    result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
+    ERRIFGOTO(result, _EXIT);
+    
+    if( (pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb")) ) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }      
+
+    fwrite(pszDecodedData, nDecodedLen, 1, pFile);
+
+    fclose(pFile);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
 }
 
 static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hThingManager, cap_string strMessageReceiverId, cap_string strTopicCategory)
@@ -201,6 +247,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     const char* pszConstApiKey = "apikey";
     cap_string strCategory = NULL;
     cap_string strDeviceId = NULL;
+    cap_string strBinaryDBPath = NULL;
 
     IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
@@ -323,9 +370,9 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = DBHandler_UpdateLatestTime(pstThingManager->pDBconn, strDeviceId);
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
-        json_object* pJsonVariable;
         cap_string strVariableName = NULL;
-        const char* pszConstVariable = "variable";
+        json_object *pJsonVariable = NULL, *pJsonFormat = NULL;
+        const char* pszConstVariable = "variable", *pszConstFormat = "format";
         
         //If api key error has occured, goto exit 
         if(result_save != ERR_CAP_NOERROR){
@@ -341,8 +388,21 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
         
-        //ignore error because send variable does not have a return type
-        result = DBHandler_InsertVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        //Handle if type is binary
+        if (json_object_object_get_ex(pJsonObject, pszConstFormat, &pJsonFormat)) {
+            strBinaryDBPath = CAPString_New();
+            ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
+
+            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath);
+            ERRIFGOTO(result, _EXIT);
+            
+            //ignore error because send variable does not have a return type
+            result = DBHandler_InsertVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, CAPString_LowPtr(strBinaryDBPath, NULL));
+        }
+        else {
+            //ignore error because send variable does not have a return type
+            result = DBHandler_InsertVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        }
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
@@ -350,6 +410,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     result = ERR_CAP_NOERROR;
 
 _EXIT:
+    SAFE_CAPSTRING_DELETE(strBinaryDBPath);
     if(result != ERR_CAP_NOERROR){
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }

@@ -12,7 +12,8 @@ libcapcommon_a_SOURCES = CAPLinkedList.c\
 					CAPLogger.c\
 					CAPQueue.c\
 					CAPKeyValue.c\
-					CAPProcess.c
+					CAPProcess.c\
+					CAPBase64.c
 
 libcapcommon_a_CFLAGS = -I../../include/capcommon
 libcapcommon_a_LIBADD = $(PTHREAD_LIBS)

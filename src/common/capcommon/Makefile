@@ -116,7 +116,8 @@ am_libcapcommon_a_OBJECTS = libcapcommon_a-CAPLinkedList.$(OBJEXT) \
 	libcapcommon_a-CAPLogger.$(OBJEXT) \
 	libcapcommon_a-CAPQueue.$(OBJEXT) \
 	libcapcommon_a-CAPKeyValue.$(OBJEXT) \
-	libcapcommon_a-CAPProcess.$(OBJEXT)
+	libcapcommon_a-CAPProcess.$(OBJEXT) \
+	libcapcommon_a-CAPBase64.$(OBJEXT)
 libcapcommon_a_OBJECTS = $(am_libcapcommon_a_OBJECTS)
 AM_V_P = $(am__v_P_$(V))
 am__v_P_ = $(am__v_P_$(AM_DEFAULT_VERBOSITY))
@@ -301,7 +302,8 @@ libcapcommon_a_SOURCES = CAPLinkedList.c\
 					CAPLogger.c\
 					CAPQueue.c\
 					CAPKeyValue.c\
-					CAPProcess.c
+					CAPProcess.c\
+					CAPBase64.c
 
 libcapcommon_a_CFLAGS = -I../../include/capcommon
 libcapcommon_a_LIBADD = $(PTHREAD_LIBS)
@@ -354,6 +356,7 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
+include ./$(DEPDIR)/libcapcommon_a-CAPBase64.Po
 include ./$(DEPDIR)/libcapcommon_a-CAPFile.Po
 include ./$(DEPDIR)/libcapcommon_a-CAPHash.Po
 include ./$(DEPDIR)/libcapcommon_a-CAPKeyValue.Po
@@ -578,6 +581,20 @@ libcapcommon_a-CAPProcess.obj: CAPProcess.c
 #	$(AM_V_CC)source='CAPProcess.c' object='libcapcommon_a-CAPProcess.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcapcommon_a_CFLAGS) $(CFLAGS) -c -o libcapcommon_a-CAPProcess.obj `if test -f 'CAPProcess.c'; then $(CYGPATH_W) 'CAPProcess.c'; else $(CYGPATH_W) '$(srcdir)/CAPProcess.c'; fi`
+
+libcapcommon_a-CAPBase64.o: CAPBase64.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcapcommon_a_CFLAGS) $(CFLAGS) -MT libcapcommon_a-CAPBase64.o -MD -MP -MF $(DEPDIR)/libcapcommon_a-CAPBase64.Tpo -c -o libcapcommon_a-CAPBase64.o `test -f 'CAPBase64.c' || echo '$(srcdir)/'`CAPBase64.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcapcommon_a-CAPBase64.Tpo $(DEPDIR)/libcapcommon_a-CAPBase64.Po
+#	$(AM_V_CC)source='CAPBase64.c' object='libcapcommon_a-CAPBase64.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcapcommon_a_CFLAGS) $(CFLAGS) -c -o libcapcommon_a-CAPBase64.o `test -f 'CAPBase64.c' || echo '$(srcdir)/'`CAPBase64.c
+
+libcapcommon_a-CAPBase64.obj: CAPBase64.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcapcommon_a_CFLAGS) $(CFLAGS) -MT libcapcommon_a-CAPBase64.obj -MD -MP -MF $(DEPDIR)/libcapcommon_a-CAPBase64.Tpo -c -o libcapcommon_a-CAPBase64.obj `if test -f 'CAPBase64.c'; then $(CYGPATH_W) 'CAPBase64.c'; else $(CYGPATH_W) '$(srcdir)/CAPBase64.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/libcapcommon_a-CAPBase64.Tpo $(DEPDIR)/libcapcommon_a-CAPBase64.Po
+#	$(AM_V_CC)source='CAPBase64.c' object='libcapcommon_a-CAPBase64.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libcapcommon_a_CFLAGS) $(CFLAGS) -c -o libcapcommon_a-CAPBase64.obj `if test -f 'CAPBase64.c'; then $(CYGPATH_W) 'CAPBase64.c'; else $(CYGPATH_W) '$(srcdir)/CAPBase64.c'; fi`
 
 ID: $(am__tagged_files)
 	$(am__define_uniq_tagged_files); mkid -fID $$unique

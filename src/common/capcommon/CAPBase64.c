@@ -136,7 +136,6 @@ cap_result CAPBase64_Decode_Len(IN char *pEncodedData, OUT int* pnDecodedLen)
 _EXIT:
 	return result;
 }
-
 cap_result CAPBase64_Decode(IN char *pEncodedData, OUT char **ppDecodedData, OUT int *pnDecodedLen)
 {
 	cap_result result = ERR_CAP_UNKNOWN;
@@ -202,4 +201,3 @@ _EXIT:
 	}
 	return result;
 }
-
