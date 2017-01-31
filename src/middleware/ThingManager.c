@@ -127,7 +127,7 @@ _EXIT:
  -Get file path from config file
  -write binary then save it into db
 */
-static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, OUT cap_string strBinaryDBPath)
+static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, OUT cap_string strBinaryDBPath, IN char * pszFormat)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     FILE* pFile = NULL;
@@ -141,12 +141,12 @@ static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_st
     strFilePath = CAPString_New();
     ERRMEMGOTO(strFilePath, result, _EXIT);
     
-    result = CAPString_PrintFormat(strFilePath, "%s/%s_%s_%lu", pszConstFilePathPrefix, CAPString_LowPtr(strDeviceId, NULL), \
-            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL));
+    result = CAPString_PrintFormat(strFilePath, "%s/%s_%s_%lu.%s", pszConstFilePathPrefix, CAPString_LowPtr(strDeviceId, NULL), \
+            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
     ERRIFGOTO(result, _EXIT);
     
-    result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%s_%lu", pszConstDBPathPrefix,  CAPString_LowPtr(strDeviceId, NULL), \
-            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL));
+    result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%s_%lu.%s", pszConstDBPathPrefix,  CAPString_LowPtr(strDeviceId, NULL), \
+            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
     ERRIFGOTO(result, _EXIT);
 
     result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
@@ -394,7 +394,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             strBinaryDBPath = CAPString_New();
             ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
 
-            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath);
+            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath, pJsonFormat);
             ERRIFGOTO(result, _EXIT);
             
             //ignore error because send variable does not have a return type
