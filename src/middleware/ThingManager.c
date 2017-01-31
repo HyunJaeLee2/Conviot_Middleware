@@ -48,6 +48,8 @@ CAPSTRING_CONST(CAPSTR_CATEGORY_UNREGISTER, "UNREGISTER");
 CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
 CAPSTRING_CONST(CAPSTR_CATEGORY_ALIVE, "ALIVE");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, TOPIC_SEPERATOR);
+CAPSTRING_CONST(CAPSTR_SENDER_DEVICE, "TM");
+CAPSTRING_CONST(CAPSTR_SENDER_SERVICE, "SM");
 
 CAPSTRING_CONST(CAPSTR_REGISTER_RESULT, "MT/REGISTER_RESULT/");
 CAPSTRING_CONST(CAPSTR_UNREGISTER_RESULT, "MT/UNREGISTER_RESULT/");
@@ -152,7 +154,7 @@ static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_st
     result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
     ERRIFGOTO(result, _EXIT);
    
-    //dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
+    dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
     pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
     if(pFile == NULL) {
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
@@ -238,25 +240,19 @@ _EXIT:
 
     return result;
 }
-static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_handle hTopicItemList,
-        char *pszPayload, int nPayloadLen, IN void *pUserData)
+
+static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItemList,
+        char *pszPayload, int nPayloadLen, IN SThingManager *pstThingManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     cap_result result_save = ERR_CAP_UNKNOWN;
-    SThingManager* pstThingManager = NULL;
     json_object* pJsonObject, *pJsonApiKey;
     const char* pszConstApiKey = "apikey";
     cap_string strCategory = NULL;
     cap_string strDeviceId = NULL;
     cap_string strBinaryDBPath = NULL;
 
-    IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-    pstThingManager = (SThingManager*)pUserData;
-
-    /*Topics are set as follow
-     *[TM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
-     */
+    IFVARERRASSIGNGOTO(pstThingManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     //Get Category
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
@@ -267,7 +263,6 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     ERRIFGOTO(result, _EXIT);
    
    
-    dlp("ThingManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL),pszPayload);
     //Parse Payload to check its api key
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
     ERRIFGOTO(result, _EXIT);
@@ -382,6 +377,134 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
 
 _EXIT:
     SAFE_CAPSTRING_DELETE(strBinaryDBPath);
+    if(result != ERR_CAP_NOERROR){
+        //Added if clause for a case where a thread is terminated without accepting any data at all
+    }
+
+    return result;
+}
+
+static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicItemList,
+        char *pszPayload, int nPayloadLen, IN SThingManager *pstThingManager)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    json_object* pJsonObject, *pJsonApiKey, *pJsonUserId;
+    int nUserId = 0;
+    const char* pszConstApiKey = "apikey", *pszConstUserId = "user_id";
+    cap_string strCategory = NULL;
+    cap_string strProductName = NULL;
+    cap_string strBinaryDBPath = NULL;
+
+    IFVARERRASSIGNGOTO(pstThingManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    //Get Category
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
+    ERRIFGOTO(result, _EXIT);
+   
+    //Get Thing ID
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strProductName);
+    ERRIFGOTO(result, _EXIT);
+   
+    //Parse Payload to check its api key
+    result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
+    ERRIFGOTO(result, _EXIT);
+   
+    if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey)) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+    
+    if (!json_object_object_get_ex(pJsonObject, pszConstUserId, &pJsonUserId)) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+
+    nUserId = json_object_get_int(pJsonUserId);
+    //save result to report error later
+    //ERR_CAP_NO_DATA : no matching device
+    //ERR_CAP_INVALID_DATA : api key doesn't match
+    result = DBHandler_VerifyServiceApiKey(pstThingManager->pDBconn, strProductName, (char *)json_object_get_string(pJsonApiKey));
+    ERRIFGOTO(result, _EXIT);
+
+    if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
+        cap_string strVariableName = NULL;
+        json_object *pJsonVariable = NULL, *pJsonFormat = NULL;
+        const char* pszConstVariable = "variable", *pszConstFormat = "format";
+        
+        //Get variable name 
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
+        ERRIFGOTO(result, _EXIT);
+        
+        
+        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+        
+        //Handle if type is binary
+        if (json_object_object_get_ex(pJsonObject, pszConstFormat, &pJsonFormat)) {
+            strBinaryDBPath = CAPString_New();
+            ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
+            
+            //TODO
+            //add user thing to binary file name when it is a servicee
+            result = saveBinaryFileThenGetPath(strProductName, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath,\
+                    (char *)json_object_get_string(pJsonFormat));
+            ERRIFGOTO(result, _EXIT);
+            
+            //ignore error because send variable does not have a return type
+            result = DBHandler_InsertServiceVariableHistory(pstThingManager->pDBconn, strProductName, nUserId, strVariableName, CAPString_LowPtr(strBinaryDBPath, NULL));
+        }
+        else {
+            //ignore error because send variable does not have a return type
+            result = DBHandler_InsertServiceVariableHistory(pstThingManager->pDBconn, strProductName, nUserId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        }
+    }
+    else {
+        ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
+    }
+    result = ERR_CAP_NOERROR;
+
+_EXIT:
+    SAFE_CAPSTRING_DELETE(strBinaryDBPath);
+    if(result != ERR_CAP_NOERROR){
+        //Added if clause for a case where a thread is terminated without accepting any data at all
+    }
+
+    return result;
+}
+static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_handle hTopicItemList,
+        char *pszPayload, int nPayloadLen, IN void *pUserData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_result result_save = ERR_CAP_UNKNOWN;
+    SThingManager* pstThingManager = NULL;
+    cap_string strSender = NULL;
+
+    IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+
+    pstThingManager = (SThingManager*)pUserData;
+
+    /*Topics are set as follow
+     *[TM]|[SM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
+     */
+    dlp("ThingManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL),pszPayload);
+
+    //Get Sender (device or service)
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strSender);
+    ERRIFGOTO(result, _EXIT);
+    
+    if (CAPString_IsEqual(strSender, CAPSTR_SENDER_DEVICE) == TRUE) {
+        result = handleDeviceMessage(strTopic, hTopicItemList, pszPayload, nPayloadLen, pstThingManager);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else if (CAPString_IsEqual(strSender, CAPSTR_SENDER_SERVICE) == TRUE) {
+        result = handleServiceMessage(strTopic, hTopicItemList, pszPayload, nPayloadLen, pstThingManager);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else {
+        ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
+    }
+    
+    result = ERR_CAP_NOERROR;
+_EXIT:
     if(result != ERR_CAP_NOERROR){
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }

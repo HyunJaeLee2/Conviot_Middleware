@@ -201,6 +201,37 @@ _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
     return result;
 }
+static cap_result checkServiceWithName(IN MYSQL *pDBconn,IN cap_string strProductName) {
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    //check if device is registered to system 
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                product.id\
+            FROM\
+                things_product product\
+            WHERE\
+                product.identifier = '%s';", CAPString_LowPtr(strProductName, NULL));
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no matching device with device id 
+    if(mysqlRow == NULL){
+        dlp("There is no matching service!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
 static cap_result checkDeviceWithId(IN MYSQL *pDBconn,IN cap_string strDeviceId) {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -290,6 +321,49 @@ cap_result DBHandler_RetrieveApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId
 _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
     return result;
+}
+
+cap_result DBHandler_VerifyServiceApiKey(IN MYSQL *pDBconn, IN cap_string strProductName, IN OUT char *pszApiKey)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+
+    int nRowCount = 0;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                vendor.api_key\
+           FROM\
+                things_product product,\
+                things_vendor vendor\
+            WHERE\
+                product.identifier = '%s' and\
+                vendor.id = product.vendor_id;", CAPString_LowPtr(strProductName, NULL));
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+
+    //if there is no matching device
+    if(mysqlRow == NULL){
+        dlp("There is no matching device!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+
+    //if api key doesn't match
+    if(strcmp(pszApiKey, mysqlRow[0]) != 0) {
+        dlp("Api Key doesn't Match!!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+
 }
 
 cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszApiKey)
@@ -496,6 +570,76 @@ cap_result DBHandler_UpdateLatestTime(IN MYSQL *pDBconn,IN cap_string strDeviceI
             where\
                 device.device_id = '%s';", CAPString_LowPtr(strDeviceId, NULL));
 
+    result = callQuery(pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_string strProductName, IN int nUserId, IN cap_string strVariableName, IN char * pszVariable)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    int nUserThingId = 0, nCustomerId = 0, nVariableId = 0;
+    
+    result = checkServiceWithName(pDBconn, strProductName);
+    ERRIFGOTO(result, _EXIT);
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                userthing.id,\
+                userthing.customer_id,\
+                variable.id\
+            FROM\
+                things_product product,\
+                things_userthing userthing,\
+                things_variable variable\
+            WHERE\
+                product.identifier = '%s' and\
+                userthing.product_id = product.id and\
+                userthing.customer_id = %d and\
+                variable.identifier = '%s' and\
+                variable.product_id = product.id;", CAPString_LowPtr(strProductName, NULL), nUserId, CAPString_LowPtr(strVariableName, NULL));
+    
+   
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no matching device with pin code
+    if(mysqlRow == NULL){
+        dlp("There is no matching device!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+    else {
+        nUserThingId = atoiIgnoreNull(mysqlRow[0]);
+        nCustomerId = atoiIgnoreNull(mysqlRow[1]);
+        nVariableId = atoiIgnoreNull(mysqlRow[2]);
+    }
+   
+    //If custumor hasn't connected their device with pin code, device's customer id is set as null
+    if(nCustomerId == NULL_ERROR) {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_variablehistory(created_at, updated_at, user_thing_id, variable_id, value)\
+                VALUES(now(), now(), %d, %d, '%s');", nUserThingId, nVariableId, pszVariable);
+        
+    }
+    else {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_variablehistory(created_at, updated_at, customer_id, user_thing_id, variable_id, value)\
+                VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
+    }
+
+    dlp("query : %s\n", query);
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
