@@ -129,7 +129,7 @@ _EXIT:
  -Get file path from config file
  -write binary then save it into db
 */
-static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, OUT cap_string strBinaryDBPath, IN char * pszFormat)
+static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, IN char *pszFormat, OUT cap_string strBinaryDBPath)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     FILE* pFile = NULL;
@@ -215,7 +215,7 @@ static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hTh
     pJsonObject = json_object_new_object();
     json_object_object_add(pJsonObject, "error", json_object_new_int(enError));
 
-    result = DBHandler_RetrieveApiKey(pstThingManager->pDBconn, strMessageReceiverId, &pszApiKey);
+    result = DBHandler_RetrieveDeviceApiKey(pstThingManager->pDBconn, strMessageReceiverId, &pszApiKey);
     ERRIFGOTO(result, _EXIT);
 
     if(pszApiKey == NULL) {
@@ -277,7 +277,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
     //save result to report error later
     //ERR_CAP_NO_DATA : no matching device
     //ERR_CAP_INVALID_DATA : api key doesn't match
-    result_save = DBHandler_VerifyApiKey(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonApiKey));
+    result_save = DBHandler_VerifyDeviceApiKey(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_REGISTER) == TRUE) {
         json_object* pJsonPinCode;
@@ -358,16 +358,16 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
             strBinaryDBPath = CAPString_New();
             ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
 
-            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath,\
-                    (char *)json_object_get_string(pJsonFormat));
+            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), \
+                    (char *)json_object_get_string(pJsonFormat), strBinaryDBPath);
             ERRIFGOTO(result, _EXIT);
             
             //ignore error because send variable does not have a return type
-            result = DBHandler_InsertVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, CAPString_LowPtr(strBinaryDBPath, NULL));
+            result = DBHandler_InsertDeviceVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, CAPString_LowPtr(strBinaryDBPath, NULL));
         }
         else {
             //ignore error because send variable does not have a return type
-            result = DBHandler_InsertVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+            result = DBHandler_InsertDeviceVariableHistory(pstThingManager->pDBconn, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
         }
     }
     else {
@@ -401,7 +401,7 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
     ERRIFGOTO(result, _EXIT);
    
-    //Get Thing ID
+    //Get Service Name
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strProductName);
     ERRIFGOTO(result, _EXIT);
    
@@ -445,8 +445,8 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
             
             //TODO
             //add user thing to binary file name when it is a servicee
-            result = saveBinaryFileThenGetPath(strProductName, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath,\
-                    (char *)json_object_get_string(pJsonFormat));
+            result = saveBinaryFileThenGetPath(strProductName, strVariableName, (char *)json_object_get_string(pJsonVariable), \
+                    (char *)json_object_get_string(pJsonFormat), strBinaryDBPath);
             ERRIFGOTO(result, _EXIT);
             
             //ignore error because send variable does not have a return type
@@ -474,12 +474,10 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         char *pszPayload, int nPayloadLen, IN void *pUserData)
 {
     cap_result result = ERR_CAP_UNKNOWN;
-    cap_result result_save = ERR_CAP_UNKNOWN;
     SThingManager* pstThingManager = NULL;
+    
     cap_string strSender = NULL;
-
     IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
     pstThingManager = (SThingManager*)pUserData;
 
     /*Topics are set as follow
@@ -488,7 +486,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     dlp("ThingManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL),pszPayload);
 
     //Get Sender (device or service)
-    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strSender);
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FIRST, (void**)&strSender);
     ERRIFGOTO(result, _EXIT);
     
     if (CAPString_IsEqual(strSender, CAPSTR_SENDER_DEVICE) == TRUE) {

@@ -38,8 +38,8 @@ CAPSTRING_CONST(CAPSTR_CATEGORY_SEND_VARIABLE, "SEND_VARIABLE");
 CAPSTRING_CONST(CAPSTR_DEVICE_REQUEST_FUNCTION, "MT/REQUEST_FUNCTION/");
 CAPSTRING_CONST(CAPSTR_SERVICE_REQUEST_FUNCTION, "MS/REQUSET_FUNCTION/");
 CAPSTRING_CONST(CAPSTR_TOPIC_SEPERATOR, TOPIC_SEPERATOR);
-
-CAPSTRING_CONST(CAPSTR_MT, "MT/");
+CAPSTRING_CONST(CAPSTR_RECEIVER_DEVICE, "TM");
+CAPSTRING_CONST(CAPSTR_RECEIVER_SERVICE, "SM");
 
 static CALLBACK cap_result destroyRelatedCondtion(int nOffset, void* pData, void* pUsrData)
 {
@@ -355,7 +355,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         //replace strDeviceId with actual device id from database
         
         //add api key
-        result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, pstActionContext->strDeviceId, &pszApiKey);
+        result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, pstActionContext->strDeviceId, &pszApiKey);
         ERRIFGOTO(result, _EXIT);
 
         if(pszApiKey == NULL) {
@@ -512,7 +512,7 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     pJsonObject = json_object_new_object();
     json_object_object_add(pJsonObject, "error", json_object_new_int(enError));
     
-    result = DBHandler_RetrieveApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
+    result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
     ERRIFGOTO(result, _EXIT);
 
     if(pszApiKey == NULL) {
@@ -580,27 +580,15 @@ _EXIT:
 
 }
 
-static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_handle hTopicItemList,
-        char *pszPayload, int nPayloadLen, IN void *pUserData)
+static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItemList, char *pszPayload, int nPayloadLen, IN SAppManager *pstAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     cap_result result_save = ERR_CAP_UNKNOWN;
     json_object* pJsonObject, *pJsonApiKey;
     const char* pszConstApiKey = "apikey";
+
     cap_string strCategory = NULL;
     cap_string strDeviceId = NULL;
-
-    SAppManager* pstAppManager = NULL;
-
-    IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-
-    pstAppManager = (SAppManager *) pUserData;
-
-
-    /*Topics are set as follow
-     *[TM]/[TOPIC CATEGORY]/[THING ID] and functio name of value name could be set at last topic level
-     */
-    dlp("AppManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL),pszPayload);
 
     //Get Category
     result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
@@ -624,7 +612,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
     //save result to report error later
     //ERR_CAP_NO_DATA : no matching device
     //ERR_CAP_INVALID_DATA : api key doesn't match
-    result_save = DBHandler_VerifyApiKey(pstAppManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonApiKey));
+    result_save = DBHandler_VerifyDeviceApiKey(pstAppManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonApiKey));
 
     if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
         json_object* pJsonVariable;
@@ -674,8 +662,7 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
-        result = DBHandler_InsertApplicationHistory(pstAppManager->pDBconn,strDeviceId, strFunctionName, nEcaId, nErrorCode);
-
+        result = DBHandler_InsertDeviceApplicationHistory(pstAppManager->pDBconn,strDeviceId, strFunctionName, nEcaId, nErrorCode);
     }
     else {
         ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
@@ -686,6 +673,155 @@ _EXIT:
     if(result != ERR_CAP_NOERROR){
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }
+
+    SAFE_CAPSTRING_DELETE(strCategory);
+    SAFE_CAPSTRING_DELETE(strDeviceId);
+    return result;
+}
+
+static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicItemList, char *pszPayload, int nPayloadLen, IN SAppManager *pstAppManager)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    json_object* pJsonObject, *pJsonApiKey, *pJsonUserId;
+    const char* pszConstApiKey = "apikey", *pszConstUserId = "user_id";
+    int nUserId = 0;
+
+    cap_string strCategory = NULL;
+    cap_string strProductName = NULL;
+
+    //Get Category
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_SECOND, (void**)&strCategory);
+    ERRIFGOTO(result, _EXIT);
+
+    //Get service name
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_THIRD, (void**)&strProductName);
+    ERRIFGOTO(result, _EXIT);
+
+    //Parse Payload to check its api key
+    result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
+    ERRIFGOTO(result, _EXIT);
+
+    if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey)) 
+    {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+
+    if(!json_object_object_get_ex(pJsonObject, pszConstUserId, &pJsonUserId))
+    {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }
+    nUserId = json_object_get_int(pJsonUserId);
+
+    //TODO
+    //Add Error code to each specific situation
+
+    //save result to report error later
+    //ERR_CAP_NO_DATA : no matching device
+    //ERR_CAP_INVALID_DATA : api key doesn't match
+    result = DBHandler_VerifyServiceApiKey(pstAppManager->pDBconn, strProductName, (char *)json_object_get_string(pJsonApiKey));
+    ERRIFGOTO(result, _EXIT);
+
+    if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_SEND_VARIABLE) == TRUE) {
+        json_object* pJsonVariable = NULL;
+        cap_string strVariableName = NULL;
+        const char* pszConstVariable = "variable";
+
+        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) 
+        {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+
+        //Get variable name 
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
+        ERRIFGOTO(result, _EXIT);
+
+        // TODO
+        // 이 아래 함수 수정해야 할지도...?
+        result = handleUserApplication(pstAppManager, strProductName, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        ERRIFGOTO(result, _EXIT);
+
+    }
+    else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_FUNCTION_RESULT) == TRUE) {
+        json_object* pJsonTemp;
+        cap_string strFunctionName = NULL;
+        const char* pszConstEcaId = "eca_id", *pszConstError = "error";
+        int nErrorCode = 0, nEcaId = 0;
+
+        if (!json_object_object_get_ex(pJsonObject, pszConstEcaId, &pJsonTemp)) 
+        {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+        nEcaId = json_object_get_int(pJsonTemp);
+
+        if (!json_object_object_get_ex(pJsonObject, pszConstError, &pJsonTemp)) 
+        {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
+        nErrorCode = json_object_get_int(pJsonTemp);
+
+        //Get variable name 
+        result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
+        ERRIFGOTO(result, _EXIT);
+
+        result = DBHandler_InsertServiceApplicationHistory(pstAppManager->pDBconn, strProductName, strFunctionName, nEcaId, nUserId, nErrorCode);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else {
+        ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
+    }
+    result = ERR_CAP_NOERROR;
+
+_EXIT:
+    if(result != ERR_CAP_NOERROR){
+        //Added if clause for a case where a thread is terminated without accepting any data at all
+    }
+
+    SAFE_CAPSTRING_DELETE(strCategory);
+    SAFE_CAPSTRING_DELETE(strProductName);
+    return result;
+}
+
+static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_handle hTopicItemList,
+        char *pszPayload, int nPayloadLen, IN void *pUserData)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_string strReceiver = NULL;
+
+    SAppManager* pstAppManager = NULL;
+    IFVARERRASSIGNGOTO(pUserData, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
+    pstAppManager = (SAppManager *) pUserData;
+
+    /*Topics are set as follow
+     *[TM]|[SM]/[TOPIC CATEGORY]/[THING ID] and function name of value name could be set at last topic level
+     */
+    dlp("AppManager received message! topic : %s, payload : %s\n", CAPString_LowPtr(strTopic, NULL), pszPayload);
+
+    // Get Receiver
+    result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FIRST, (void**)&strReceiver);
+    ERRIFGOTO(result, _EXIT);
+
+    if(CAPString_IsEqual(strReceiver, CAPSTR_RECEIVER_DEVICE) == TRUE)
+    {
+        result = handleDeviceMessage(strTopic, hTopicItemList, pszPayload, nPayloadLen, pstAppManager);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else if(CAPString_IsEqual(strReceiver, CAPSTR_RECEIVER_SERVICE) == TRUE)
+    {
+        result = handleServiceMessage(strTopic, hTopicItemList, pszPayload, nPayloadLen, pstAppManager);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else
+    {
+        ERRASSIGNGOTO(result, ERR_CAP_NOT_SUPPORTED, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    if(result != ERR_CAP_NOERROR){
+        //Added if clause for a case where a thread is terminated without accepting any data at all
+    }
+    
+    SAFE_CAPSTRING_DELETE(strReceiver);
     return result;
 }
 

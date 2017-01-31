@@ -232,6 +232,7 @@ _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
     return result;
 }
+
 static cap_result checkDeviceWithId(IN MYSQL *pDBconn,IN cap_string strDeviceId) {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -281,7 +282,7 @@ cap_result DBHandler_CloseDB(MYSQL *pDBconn)
     return result;
 }
 
-cap_result DBHandler_RetrieveApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN OUT char **ppszApiKey)
+cap_result DBHandler_RetrieveDeviceApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN OUT char **ppszApiKey)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -323,6 +324,44 @@ _EXIT:
     return result;
 }
 
+cap_result DBHandler_RetrieveServiceApiKey(IN MYSQL *pDBconn, IN cap_string strProductName, IN OUT char **ppszApiKey)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+
+    int nRowCount = 0;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                vendor.api_key\
+            FROM\
+                things_product product,\
+                things_vendor vendor\
+            WHERE\
+                product.identifier = '%s' and\
+                vendor.id = product.vendor_id;", CAPString_LowPtr(strProductName, NULL));
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+
+    //if there is no matching service
+    if(mysqlRow == NULL){
+        dlp("There is no matching service!\n");
+    }
+    else {
+        *ppszApiKey = strdup(mysqlRow[0]);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
 cap_result DBHandler_VerifyServiceApiKey(IN MYSQL *pDBconn, IN cap_string strProductName, IN OUT char *pszApiKey)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -347,9 +386,9 @@ cap_result DBHandler_VerifyServiceApiKey(IN MYSQL *pDBconn, IN cap_string strPro
 
     mysqlRow = mysql_fetch_row(pMysqlResult);
 
-    //if there is no matching device
+    //if there is no matching service
     if(mysqlRow == NULL){
-        dlp("There is no matching device!\n");
+        dlp("There is no matching service!\n");
         ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
     }
 
@@ -366,7 +405,7 @@ _EXIT:
 
 }
 
-cap_result DBHandler_VerifyApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszApiKey)
+cap_result DBHandler_VerifyDeviceApiKey(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszApiKey)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -613,9 +652,9 @@ cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_stri
 
     mysqlRow = mysql_fetch_row(pMysqlResult);
     
-    //if there is no matching device with pin code
+    //if there is no matching service
     if(mysqlRow == NULL){
-        dlp("There is no matching device!\n");
+        dlp("There is no matching service!\n");
         ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
     }
     else {
@@ -624,7 +663,7 @@ cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_stri
         nVariableId = atoiIgnoreNull(mysqlRow[2]);
     }
    
-    //If custumor hasn't connected their device with pin code, device's customer id is set as null
+    //If custumor hasn't connected their service, service's customer id is set as null
     if(nCustomerId == NULL_ERROR) {
         snprintf(query, QUERY_SIZE, "\
                 INSERT INTO\
@@ -649,7 +688,7 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_InsertVariableHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable)
+cap_result DBHandler_InsertDeviceVariableHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -717,7 +756,84 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcaId, IN int nErrorCode)
+cap_result DBHandler_InsertServiceApplicationHistory(IN MYSQL *pDBconn, IN cap_string strProductName, IN cap_string strFunctionName, IN int nEcaId, IN int nUserId, IN int nErrorCode)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    int nCustomerId = 0, nFunctionId = 0;
+    
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                function.id\
+            FROM\
+                things_function function\
+            WHERE\
+                function.identifier = '%s';", CAPString_LowPtr(strFunctionName, NULL));
+   
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no matching service
+    if(mysqlRow == NULL){
+        dlp("There is no matching service!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+    else {
+        nFunctionId = atoiIgnoreNull(mysqlRow[0]);
+    }
+ 
+    memset(query, 0, QUERY_SIZE);
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                customer.id\
+            FROM\
+                things_customer customer\
+            WHERE\
+                customer.user_id = %d;", nUserId);
+   
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    mysqlRow = mysql_fetch_row(pMysqlResult);
+    
+    //if there is no matching service
+    if(mysqlRow == NULL){
+        dlp("There is no matching service!\n");
+        ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+    }
+    else {
+        nCustomerId = atoiIgnoreNull(mysqlRow[0]);
+    } 
+    //TODO
+    //Add message to database with error code
+    if(nErrorCode == 0) {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_applicationhistory(created_at, updated_at, customer_id, event_condition_action_id, function_id, status)\
+                VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nEcaId, nFunctionId, "success");
+    }
+    else {
+        snprintf(query, QUERY_SIZE, "\
+                INSERT INTO\
+                things_applicationhistory(created_at, updated_at, customer_id, event_condition_action_id, function_id, status, message)\
+                VALUES(now(), now(), %d, %d, %d, '%s', '%d');", nCustomerId, nEcaId, nFunctionId, "failed", nErrorCode);
+    }
+
+    result = callQuery(pDBconn, query);
+    ERRIFGOTO(result, _EXIT);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+cap_result DBHandler_InsertDeviceApplicationHistory(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN cap_string strFunctionName, IN int nEcaId, IN int nErrorCode)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -771,7 +887,6 @@ cap_result DBHandler_InsertApplicationHistory(IN MYSQL *pDBconn,IN cap_string st
                 things_applicationhistory(created_at, updated_at, customer_id, event_condition_action_id, function_id, status)\
                 VALUES(now(), now(), %d, %d, %d, %s);", nCustomerId, nEcaId, nFunctionId, "failed");
     }
-
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
