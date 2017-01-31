@@ -152,7 +152,7 @@ static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_st
     result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
     ERRIFGOTO(result, _EXIT);
    
-    dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
+    //dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
     pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
     if(pFile == NULL) {
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
@@ -306,17 +306,6 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_REGISTER_RESULT);
         ERRIFGOTO(result, _EXIT);
 
-        
-        /*
-        if(result_save == ERR_CAP_NOERROR){
-            result = handleDisabledScenario(strDeviceId, pstThingManager->hAppEngine);
-            ERRIFGOTO(result, _EXIT);
-            
-            //update latest time when register
-            result = DBHandler_UpdateLatestTime(CAPString_LowPtr(strDeviceId, NULL));
-            ERRIFGOTO(result, _EXIT);
-        }
-        */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_UNREGISTER) == TRUE) {
         json_object* pJsonPinCode;
@@ -335,31 +324,11 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
         }
 
         //publish error code of function result
-        result_save = DBHandler_UnregisterDevice(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
+        result_save = DBHandler_UnregisterDeviceAndEca(pstThingManager->pDBconn, strDeviceId, (char *)json_object_get_string(pJsonPinCode));  
         
         result = ThingManager_PublishErrorCode(result_save, pstThingManager, strDeviceId, CAPSTR_UNREGISTER_RESULT);
         ERRIFGOTO(result, _EXIT);
 
-        
-        /*
-        result = disableDependentScenario(strDeviceId, pstThingManager->hAppEngine);
-        ERRIFGOTO(result, _EXIT);
-            
-        //delete thing from DB
-        result = DBHandler_DeleteThing(strDeviceId);
-
-        //Save result to check if an error occured
-        result_save = result;
-        
-        result = ThingManager_PublishErrorCode(result, pstThingManager, strDeviceId, CAPSTR_REGACK);
-        ERRIFGOTO(result, _EXIT);
-        
-        if(result_save == ERR_CAP_NOERROR){
-            //make payload to Cloud
-            result = makeMessageToCloud(pstThingManager, strCategory, strDeviceId, pszPayload, nPayloadLen);
-            ERRIFGOTO(result, _EXIT);
-        }
-        */
     }
     else if (CAPString_IsEqual(strCategory, CAPSTR_CATEGORY_ALIVE) == TRUE) {
         //If api key error has occured, goto exit 
@@ -394,7 +363,8 @@ static CALLBACK cap_result mqttMessageHandlingCallback(cap_string strTopic, cap_
             strBinaryDBPath = CAPString_New();
             ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
 
-            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath, pJsonFormat);
+            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), strBinaryDBPath,\
+                    (char *)json_object_get_string(pJsonFormat));
             ERRIFGOTO(result, _EXIT);
             
             //ignore error because send variable does not have a return type

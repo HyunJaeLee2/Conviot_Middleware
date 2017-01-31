@@ -392,7 +392,7 @@ _EXIT:
 
 }
 
-cap_result DBHandler_DisableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDeviceId)
+cap_result disableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDeviceId)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -448,26 +448,29 @@ cap_result DBHandler_DisableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDevi
     result = ERR_CAP_NOERROR;
 _EXIT:
     return result;
+}
+
+cap_result DBHandler_DisableDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDeviceId)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+
+    result = disableDeviceAndEca(pDBconn, strDeviceId);
+    ERRIFGOTO(result, _EXIT);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
 
 }
 
-cap_result DBHandler_UnregisterDevice(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN char *pszPinCode)
+cap_result DBHandler_UnregisterDeviceAndEca(IN MYSQL *pDBconn,IN cap_string strDeviceId, IN char *pszPinCode)
 {
     cap_result result = ERR_CAP_UNKNOWN;
-    char query[QUERY_SIZE];
     
     result = checkDeviceWithId(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
 
-    snprintf(query, QUERY_SIZE, "\
-            UPDATE\
-                things_device device\
-            SET\
-                device.is_connected = 0\
-            where\
-                device.pin_code = '%s';", pszPinCode);
-
-    result = callQuery(pDBconn, query);
+    result = disableDeviceAndEca(pDBconn, strDeviceId);
     ERRIFGOTO(result, _EXIT);
 
     result = ERR_CAP_NOERROR;
