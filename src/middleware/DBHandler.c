@@ -909,34 +909,63 @@ cap_result DBHandler_MakeConditionListWithService(IN MYSQL *pDBconn, IN cap_stri
 
     result = checkServiceWithName(pDBconn, strProductName);
     ERRIFGOTO(result, _EXIT);
-    
-    snprintf(query, QUERY_SIZE, "\
-            SELECT\
-                cond.id,\
-                cond.expression,\
-                eca.id,\
-                eca.operator,\
-                variable.type,\
-    			(SELECT count(*) FROM things_condition cond WHERE cond.event_condition_action_id = eca.id) as cnt\
-            FROM\
-                things_product product,\
-                things_userthing userthing,\
-                things_variable variable,\
-                things_customer customer,\
-                things_condition cond,\
-                things_eventconditionaction eca\
-            WHERE\
-                product.identifier = '%s' and\
-                customer.user_id = %d and\
-                userthing.product_id = product.id and\
-                userthing.customer_id = customer.id and\
-                variable.identifier = '%s' and\
-                variable.product_id = product.id and\
-                eca.customer_id = userthing.customer_id  and\
-                eca.usable = 1 and\
-                cond.user_thing_id = userthing.id and\
-                cond.variable_id = variable.id and\
-                cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strProductName, NULL), nUserId, CAPString_LowPtr(strVariableName, NULL));
+
+    //If nUserId == -1, it means a service is a general service such as date and time
+    if(nUserId == -1) {
+        snprintf(query, QUERY_SIZE, "\
+                SELECT\
+                    cond.id,\
+                    cond.expression,\
+                    eca.id,\
+                    eca.operator,\
+                    variable.type,\
+        			(SELECT count(*) FROM things_condition cond WHERE cond.event_condition_action_id = eca.id) as cnt\
+                FROM\
+                    things_product product,\
+                    things_userthing userthing,\
+                    things_variable variable,\
+                    things_condition cond,\
+                    things_eventconditionaction eca\
+                WHERE\
+                    product.identifier = '%s' and\
+                    userthing.product_id = product.id and\
+                    variable.identifier = '%s' and\
+                    variable.product_id = product.id and\
+                    eca.customer_id = userthing.customer_id  and\
+                    eca.usable = 1 and\
+                    cond.user_thing_id = userthing.id and\
+                    cond.variable_id = variable.id and\
+                    cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strProductName, NULL), CAPString_LowPtr(strVariableName, NULL));
+    }
+    else {
+        snprintf(query, QUERY_SIZE, "\
+                SELECT\
+                    cond.id,\
+                    cond.expression,\
+                    eca.id,\
+                    eca.operator,\
+                    variable.type,\
+        			(SELECT count(*) FROM things_condition cond WHERE cond.event_condition_action_id = eca.id) as cnt\
+                FROM\
+                    things_product product,\
+                    things_userthing userthing,\
+                    things_variable variable,\
+                    things_customer customer,\
+                    things_condition cond,\
+                    things_eventconditionaction eca\
+                WHERE\
+                    product.identifier = '%s' and\
+                    customer.user_id = %d and\
+                    userthing.product_id = product.id and\
+                    userthing.customer_id = customer.id and\
+                    variable.identifier = '%s' and\
+                    variable.product_id = product.id and\
+                    eca.customer_id = userthing.customer_id  and\
+                    eca.usable = 1 and\
+                    cond.user_thing_id = userthing.id and\
+                    cond.variable_id = variable.id and\
+                    cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strProductName, NULL), nUserId, CAPString_LowPtr(strVariableName, NULL));
+    }
 
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
