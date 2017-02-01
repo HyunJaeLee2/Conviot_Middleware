@@ -1233,8 +1233,7 @@ _EXIT:
     return result;
 }
 
-
-cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList)
+static cap_result retrieveDeviceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -1242,29 +1241,18 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
     MYSQL_ROW mysqlRow;
     int nRowCount = 0;
     char *pszArgumentPayload = NULL;
-
+    
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 function.identifier,\
-                action.arguments,\
-                product.type,\
-                customer.user_id,\
-                device.device_id,\
-                product.identifier\
+                action.arguments\
             FROM\
                 things_function function,\
-                things_action action,\
-                things_product product,\
-                things_device device,\
-                things_userthing userthing,\
-                things_customer customer\
+                things_action action\
             WHERE\
                 action.event_condition_action_id = %d and\
-                function.id = action.function_id and\
-                function.product_id = product.id and\
-                action.user_thing_id = userthing.id and\
-                device.user_thing_id = userthing.id and\
-                userthing.customer_id = customer.id;", nEcaId);
+                function.id = action.function_id;", nEcaId);
+
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -1327,6 +1315,104 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
     result = ERR_CAP_NOERROR;
 _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+
+static cap_result retrieveServiceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    char *pszArgumentPayload = NULL;
+
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                function.identifier,\
+                action.arguments,\
+                customer.user_id,\
+                product.identifier\
+            FROM\
+                things_function function,\
+                things_action action,\
+                things_product product,\
+                things_service service,\
+                things_userthing userthing,\
+                things_customer customer\
+            WHERE\
+                action.event_condition_action_id = %d and\
+                function.id = action.function_id and\
+                function.product_id = product.id and\
+                action.user_thing_id = userthing.id and\
+                service.user_thing_id = userthing.id and\
+                userthing.customer_id = customer.id;", nEcaId);
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
+    {
+        SActionContext *pstActionContext = (SActionContext*)calloc(1, sizeof(SActionContext));   
+        
+        pstActionContext->strFunctionName = CAPString_New();
+        ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
+        
+        //Handle if argument is null
+        if(mysqlRow[1] != NULL && ( strcmp("null", mysqlRow[1]) != 0 ) ){
+            pstActionContext->strArgumentPayload = CAPString_New();
+            ERRMEMGOTO(pstActionContext->strArgumentPayload, result, _EXIT);
+        
+            //replaceWithRealVariable then add it to structure 
+            result = replaceWithRealVariable(pDBconn, mysqlRow[1], &pszArgumentPayload);
+            ERRIFGOTO(result, _EXIT);
+
+            result = CAPString_SetLow(pstActionContext->strArgumentPayload, pszArgumentPayload , CAPSTRING_MAX);
+            ERRIFGOTO(result, _EXIT);
+
+            SAFEMEMFREE(pszArgumentPayload);
+        }
+        else {
+            //if there is no argument, set payload as null
+            pstActionContext->strArgumentPayload = NULL;
+        }
+
+        pstActionContext->bIsServiceType = 1;
+
+        result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
+        pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[2]); 
+        
+        pstActionContext->strReceiverId = CAPString_New();
+        ERRMEMGOTO(pstActionContext->strReceiverId, result, _EXIT);
+        
+        result = CAPString_SetLow(pstActionContext->strReceiverId, mysqlRow[3] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
+        result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);
+        ERRIFGOTO(result, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT cap_handle hActionList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+
+    result = retrieveDeviceActionList(pDBconn, nEcaId, hActionList);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = retrieveServiceActionList(pDBconn, nEcaId, hActionList);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = ERR_CAP_NOERROR;
+_EXIT:
     return result;
 }
 
