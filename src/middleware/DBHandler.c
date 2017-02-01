@@ -1245,13 +1245,20 @@ static cap_result retrieveDeviceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN 
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 function.identifier,\
-                action.arguments\
+                action.arguments,\
+                device.device_id\
             FROM\
                 things_function function,\
-                things_action action\
+                things_action action,\
+                things_product product,\
+                things_userthing userthing,\
+                things_device device\
             WHERE\
                 action.event_condition_action_id = %d and\
-                function.id = action.function_id;", nEcaId);
+                function.id = action.function_id and \
+                function.product_id = product.id and\
+                action.user_thing_id = userthing.id and\
+                device.user_thing_id = userthing.id;", nEcaId);
 
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
@@ -1282,30 +1289,10 @@ static cap_result retrieveDeviceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN 
             pstActionContext->strArgumentPayload = NULL;
         }
 
-        //if it is a thing, set function name
-        if(strcmp("thing", mysqlRow[2]) == 0){
-            pstActionContext->bIsServiceType = 0;
-            
-            result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
-            ERRIFGOTO(result, _EXIT);
-
-        }
-        //If it is a service, set product identifier as a function name
-        //TODO
-        //seperate function name and service name in function context
-        else{
-            pstActionContext->bIsServiceType = 1;
-            
-            result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[5] , CAPSTRING_MAX);
-            ERRIFGOTO(result, _EXIT);
-        }
-
-        pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[3]); 
-        
         pstActionContext->strReceiverId = CAPString_New();
         ERRMEMGOTO(pstActionContext->strReceiverId, result, _EXIT);
         
-        result = CAPString_SetLow(pstActionContext->strReceiverId, mysqlRow[4] , CAPSTRING_MAX);
+        result = CAPString_SetLow(pstActionContext->strReceiverId, mysqlRow[2] , CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
 
         result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);
@@ -1348,7 +1335,6 @@ static cap_result retrieveServiceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN
                 action.user_thing_id = userthing.id and\
                 service.user_thing_id = userthing.id and\
                 userthing.customer_id = customer.id;", nEcaId);
-
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
