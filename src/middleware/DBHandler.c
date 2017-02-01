@@ -1270,6 +1270,9 @@ static cap_result retrieveDeviceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN 
         pstActionContext->strFunctionName = CAPString_New();
         ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
         
+        result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+        
         //Handle if argument is null
         if(mysqlRow[1] != NULL && ( strcmp("null", mysqlRow[1]) != 0 ) ){
             pstActionContext->strArgumentPayload = CAPString_New();
@@ -1345,6 +1348,9 @@ static cap_result retrieveServiceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN
         pstActionContext->strFunctionName = CAPString_New();
         ERRMEMGOTO(pstActionContext->strFunctionName, result, _EXIT);
         
+        result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
         //Handle if argument is null
         if(mysqlRow[1] != NULL && ( strcmp("null", mysqlRow[1]) != 0 ) ){
             pstActionContext->strArgumentPayload = CAPString_New();
@@ -1365,9 +1371,6 @@ static cap_result retrieveServiceActionList(IN MYSQL *pDBconn, IN int nEcaId, IN
         }
 
         pstActionContext->bIsServiceType = 1;
-
-        result = CAPString_SetLow(pstActionContext->strFunctionName, mysqlRow[0] , CAPSTRING_MAX);
-        ERRIFGOTO(result, _EXIT);
 
         pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[2]); 
         
