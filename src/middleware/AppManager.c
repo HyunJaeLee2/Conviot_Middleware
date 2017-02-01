@@ -329,12 +329,35 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
         if(pstActionContext->bIsServiceType)  
         {   
             result = CAPString_Set(strTopic, CAPSTR_SERVICE_REQUEST_FUNCTION);
+            ERRIFGOTO(result, _EXIT);
+            
+            //add api key
+            result = DBHandler_RetrieveServiceApiKey(pstAppManager->pDBconn, pstActionContext->strReceiverId, &pszApiKey);
+            ERRIFGOTO(result, _EXIT);
+
+            if(pszApiKey == NULL) {
+                //do nothing
+            } 
+            else {
+                json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
+            }
         }
         else
         {   
             result = CAPString_Set(strTopic, CAPSTR_DEVICE_REQUEST_FUNCTION);
+            ERRIFGOTO(result, _EXIT);
+            
+            //add api key
+            result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, pstActionContext->strReceiverId, &pszApiKey);
+            ERRIFGOTO(result, _EXIT);
+
+            if(pszApiKey == NULL) {
+                //do nothing
+            } 
+            else {
+                json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
+            }
         }
-        ERRIFGOTO(result, _EXIT);
 
         result = CAPString_AppendString(strTopic, pstActionContext->strReceiverId);
         ERRIFGOTO(result, _EXIT);
@@ -351,16 +374,6 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
         //add eca id
         json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
 
-        //add api key
-        result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, pstActionContext->strReceiverId, &pszApiKey);
-        ERRIFGOTO(result, _EXIT);
-
-        if(pszApiKey == NULL) {
-            //do nothing
-        } 
-        else {
-            json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
-        }
 
         // Add user_id argument if action type is service
         if(pstActionContext->bIsServiceType)
