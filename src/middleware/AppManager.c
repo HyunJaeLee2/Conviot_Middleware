@@ -79,7 +79,7 @@ static CALLBACK cap_result destroyAction(int nOffset, void* pData, void* pUsrDat
 
     pstActionContext = (SActionContext*)pData;
 
-	SAFE_CAPSTRING_DELETE(pstActionContext->strDeviceId);
+	SAFE_CAPSTRING_DELETE(pstActionContext->strReceiverId);
 	SAFE_CAPSTRING_DELETE(pstActionContext->strFunctionName);
 	SAFE_CAPSTRING_DELETE(pstActionContext->strArgumentPayload);
     SAFEMEMFREE(pstActionContext);
@@ -289,7 +289,7 @@ _EXIT:
     return result;
 }
 
-static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handle hAppManager)
+static cap_result requestAction(int nEcaId, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     json_object* pJsonObject = NULL, *pJsonArgumentArray = NULL;
@@ -336,7 +336,7 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         }
         ERRIFGOTO(result, _EXIT);
 
-        result = CAPString_AppendString(strTopic, pstActionContext->strDeviceId);
+        result = CAPString_AppendString(strTopic, pstActionContext->strReceiverId);
         ERRIFGOTO(result, _EXIT);
 
         result = CAPString_AppendString(strTopic, CAPSTR_TOPIC_SEPERATOR);
@@ -351,11 +351,8 @@ static cap_result requestAction(int nEcaId, IN cap_string strDeviceId, cap_handl
         //add eca id
         json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
 
-        //TODO
-        //replace strDeviceId with actual device id from database
-        
         //add api key
-        result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, pstActionContext->strDeviceId, &pszApiKey);
+        result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, pstActionContext->strReceiverId, &pszApiKey);
         ERRIFGOTO(result, _EXIT);
 
         if(pszApiKey == NULL) {
@@ -402,7 +399,7 @@ _EXIT:
     return result;
 }
 
-static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedConditionList, char *pszVariable, IN cap_string strDeviceId, cap_handle hAppManager)
+static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedConditionList, char *pszVariable, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     SConditionContext* pstConditionContext = NULL;
@@ -425,7 +422,7 @@ static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedCond
         //if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
         if(pstConditionContext->bIsSatisfied) {
             if(pstConditionContext->bIsSingleCondition || pstConditionContext->enEcaOp == OPERATOR_OR) {
-                result = requestAction(pstConditionContext->nEcaId, strDeviceId, hAppManager);
+                result = requestAction(pstConditionContext->nEcaId, hAppManager);
                 ERRIFGOTO(result, _EXIT);
             }
         }
@@ -437,7 +434,7 @@ _EXIT:
 
 }
 
-static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, IN cap_string strDeviceId, cap_handle hAppManager) 
+static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, cap_handle hAppManager) 
 {
     cap_result result = ERR_CAP_UNKNOWN;
     int nLength = 0, nLoop = 0;
@@ -457,7 +454,7 @@ static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, IN cap_s
 
         nEcaId = *pnEcaId;
 
-        result = requestAction(nEcaId, strDeviceId, hAppManager);
+        result = requestAction(nEcaId, hAppManager);
         ERRIFGOTO(result, _EXIT);
     }
 
@@ -536,6 +533,50 @@ _EXIT:
     return result;
 }
 
+static cap_result handleUserApplicationWithService(IN SAppManager *pstAppManager, IN cap_string strProductName, IN cap_string strVariableName,\
+        IN int nUserId, IN char *pszVariable) {
+    cap_result result = ERR_CAP_UNKNOWN;
+    cap_handle hRelatedConditionList = NULL; 
+    cap_handle hSatisfiedEcaList = NULL; 
+
+    result = CAPLinkedList_Create(&hRelatedConditionList);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = CAPLinkedList_Create(&hSatisfiedEcaList);
+    ERRIFGOTO(result, _EXIT);
+
+    //Get Condition List
+    result = DBHandler_MakeConditionListWithService(pstAppManager->pDBconn, strProductName, strVariableName, nUserId, hRelatedConditionList);
+    ERRIFGOTO(result, _EXIT);
+
+    //Compute Each condition -> if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
+    result = computeConditionsThenActuateIfPossible(hRelatedConditionList, pszVariable, (cap_handle)pstAppManager );
+    ERRIFGOTO(result, _EXIT);
+
+    //push is_satisfied of each condition into db(if there is only one condition or operator 'any' condition, this step will be ignored)
+    result = DBHandler_InsertSatisfiedCondition(pstAppManager->pDBconn, hRelatedConditionList);
+    ERRIFGOTO(result, _EXIT);
+
+    // Compute each eca if condition is met(only if there is more than one condition)
+    result = DBHandler_RetrieveSatisfiedEcaList(pstAppManager->pDBconn, hSatisfiedEcaList);
+    ERRIFGOTO(result, _EXIT);
+
+    // Actuate function where eca condition is met
+    result = actuateSatisfiedEcaList(hSatisfiedEcaList, (cap_handle)pstAppManager);
+    ERRIFGOTO(result, _EXIT);
+
+_EXIT:
+    if(result != ERR_CAP_NOERROR){
+        //nothing 
+    }
+
+    CAPLinkedList_Traverse(hRelatedConditionList, destroyRelatedCondtion, NULL);
+    CAPLinkedList_Traverse(hSatisfiedEcaList, destroySatisfiedEca, NULL);
+    CAPLinkedList_Destroy(&hRelatedConditionList);
+    CAPLinkedList_Destroy(&hSatisfiedEcaList);
+    return result;
+
+}
 static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
     cap_result result = ERR_CAP_UNKNOWN;
     cap_handle hRelatedConditionList = NULL; 
@@ -552,7 +593,7 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     ERRIFGOTO(result, _EXIT);
 
     //Compute Each condition -> if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
-    result = computeConditionsThenActuateIfPossible(hRelatedConditionList, pszVariable, strDeviceId, (cap_handle)pstAppManager );
+    result = computeConditionsThenActuateIfPossible(hRelatedConditionList, pszVariable, (cap_handle)pstAppManager );
     ERRIFGOTO(result, _EXIT);
 
     //push is_satisfied of each condition into db(if there is only one condition or operator 'any' condition, this step will be ignored)
@@ -564,7 +605,7 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     ERRIFGOTO(result, _EXIT);
 
     // Actuate function where eca condition is met
-    result = actuateSatisfiedEcaList(hSatisfiedEcaList, strDeviceId, (cap_handle)pstAppManager);
+    result = actuateSatisfiedEcaList(hSatisfiedEcaList, (cap_handle)pstAppManager);
     ERRIFGOTO(result, _EXIT);
 
 _EXIT:
@@ -735,7 +776,7 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
 
         // TODO
         // 이 아래 함수 수정해야 할지도...?
-        result = handleUserApplication(pstAppManager, strProductName, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        result = handleUserApplicationWithService(pstAppManager, strProductName, strVariableName, nUserId, (char *)json_object_get_string(pJsonVariable));
         ERRIFGOTO(result, _EXIT);
 
     }

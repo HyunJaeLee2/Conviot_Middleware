@@ -638,11 +638,13 @@ cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_stri
             FROM\
                 things_product product,\
                 things_userthing userthing,\
-                things_variable variable\
+                things_variable variable,\
+                things_customer customer\
             WHERE\
                 product.identifier = '%s' and\
+                customer.user_id = %d and\
                 userthing.product_id = product.id and\
-                userthing.customer_id = %d and\
+                userthing.customer_id = customer.id and\
                 variable.identifier = '%s' and\
                 variable.product_id = product.id;", CAPString_LowPtr(strProductName, NULL), nUserId, CAPString_LowPtr(strVariableName, NULL));
     
@@ -896,6 +898,115 @@ _EXIT:
     return result;
 }
 
+cap_result DBHandler_MakeConditionListWithService(IN MYSQL *pDBconn, IN cap_string strProductName,\
+        IN cap_string strVariableName, IN int nUserId, IN OUT cap_handle hRelatedConditionList)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+
+    result = checkServiceWithName(pDBconn, strProductName);
+    ERRIFGOTO(result, _EXIT);
+    
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                cond.id,\
+                cond.expression,\
+                eca.id,\
+                eca.operator,\
+                variable.type,\
+    			(SELECT count(*) FROM things_condition cond WHERE cond.event_condition_action_id = eca.id) as cnt\
+            FROM\
+                things_product product,\
+                things_userthing userthing,\
+                things_variable variable,\
+                things_customer customer,\
+                things_condition cond,\
+                things_eventconditionaction eca\
+            WHERE\
+                product.identifier = '%s' and\
+                customer.user_id = %d and\
+                userthing.product_id = product.id and\
+                userthing.customer_id = customer.id and\
+                variable.identifier = '%s' and\
+                variable.product_id = product.id and\
+                eca.customer_id = userthing.customer_id  and\
+                eca.usable = 1 and\
+                cond.user_thing_id = userthing.id and\
+                cond.variable_id = variable.id and\
+                cond.event_condition_action_id = eca.id;", CAPString_LowPtr(strProductName, NULL), nUserId, CAPString_LowPtr(strVariableName, NULL));
+
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
+    ERRIFGOTO(result, _EXIT);
+
+    while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
+    {
+        SConditionContext *pstConditionContext = (SConditionContext*)calloc(1, sizeof(SConditionContext));    
+    
+        pstConditionContext->strExpression = CAPString_New();
+        ERRMEMGOTO(pstConditionContext->strExpression, result, _EXIT);
+        
+        pstConditionContext->nConditionId = atoiIgnoreNull(mysqlRow[0]);
+
+        result = CAPString_SetLow(pstConditionContext->strExpression, mysqlRow[1] , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+
+        pstConditionContext->nEcaId = atoiIgnoreNull(mysqlRow[2]);
+
+        //check operator
+        if(strncmp(mysqlRow[3], "all", 3) == 0){
+            pstConditionContext->enEcaOp = OPERATOR_AND;
+        }
+        else if(strncmp(mysqlRow[3], "any", 3) == 0){
+            pstConditionContext->enEcaOp = OPERATOR_OR;
+        }
+        else {
+            //Not supported
+            dlp("not supported operator\n");
+        }
+       
+        //check type 
+        if(strncmp(mysqlRow[4], "integer", 7) == 0){
+            pstConditionContext->enType = TYPE_INTEGER;
+        }
+        else if(strncmp(mysqlRow[4], "double", 6) == 0){
+            pstConditionContext->enType = TYPE_DOUBLE;
+        }
+        else if(strncmp(mysqlRow[4], "binary", 6) == 0){
+            pstConditionContext->enType = TYPE_BINARY;
+        }
+        else if(strncmp(mysqlRow[4], "string", 6) == 0){
+            pstConditionContext->enType = TYPE_STRING;
+        }
+        else if(strncmp(mysqlRow[4], "select", 6) == 0){
+            pstConditionContext->enType = TYPE_SELECT;
+        }
+        else {
+            //Not supported
+            dlp("not supported type\n");
+        }
+
+        //check if there is only one condition in eca
+        if(strncmp(mysqlRow[5], "1", 1) == 0){
+            dlp("is a single condition\n");
+            pstConditionContext->bIsSingleCondition = TRUE;
+        }
+        else {
+            dlp("not a single condition\n");
+            pstConditionContext->bIsSingleCondition = FALSE;
+        }
+        
+        result = CAPLinkedList_Add(hRelatedConditionList, LINKED_LIST_OFFSET_LAST, 0, pstConditionContext);
+        ERRIFGOTO(result, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
 cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDeviceId,\
         IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList)
 {
@@ -1083,10 +1194,10 @@ cap_result DBHandler_RetrieveActionList(IN MYSQL *pDBconn, IN int nEcaId, IN OUT
 
         pstActionContext->nUserId = atoiIgnoreNull(mysqlRow[3]); 
         
-        pstActionContext->strDeviceId = CAPString_New();
-        ERRMEMGOTO(pstActionContext->strDeviceId, result, _EXIT);
+        pstActionContext->strReceiverId = CAPString_New();
+        ERRMEMGOTO(pstActionContext->strReceiverId, result, _EXIT);
         
-        result = CAPString_SetLow(pstActionContext->strDeviceId, mysqlRow[4] , CAPSTRING_MAX);
+        result = CAPString_SetLow(pstActionContext->strReceiverId, mysqlRow[4] , CAPSTRING_MAX);
         ERRIFGOTO(result, _EXIT);
 
         result = CAPLinkedList_Add(hActionList, LINKED_LIST_OFFSET_LAST, 0, pstActionContext);

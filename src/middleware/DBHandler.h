@@ -31,6 +31,7 @@ cap_result DBHandler_InsertDeviceApplicationHistory(IN MYSQL *pDBconn, IN cap_st
 cap_result DBHandler_InsertServiceApplicationHistory(IN MYSQL *pDBconn, IN cap_string strProductName, IN cap_string strFunctionName, IN int nEcaId, IN int nUserId, IN int nErrorCode);
 
 cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList);
+cap_result DBHandler_MakeConditionListWithService(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN cap_string strVariableName, IN int nUserId, IN OUT cap_handle hRelatedConditionList);
 //
 cap_result DBHandler_RegisterDevice(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszPinCode);  
 cap_result DBHandler_UnregisterDeviceAndEca(IN MYSQL *pDBconn, IN cap_string strDeviceId, IN char *pszPinCode);  

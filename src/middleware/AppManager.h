@@ -34,7 +34,7 @@ typedef struct _SConditionContext {
 } SConditionContext;
 
 typedef struct _SActionContext {
-    cap_string strDeviceId;
+    cap_string strReceiverId;   //receiver could be either service or device
     cap_string strFunctionName;	
     cap_string strArgumentPayload;	
     cap_bool   bIsServiceType;
