@@ -577,7 +577,7 @@ _EXIT:
     return result;
 
 }
-static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
+static cap_result handleUserApplicationWithDevice(IN SAppManager *pstAppManager, IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
     cap_result result = ERR_CAP_UNKNOWN;
     cap_handle hRelatedConditionList = NULL; 
     cap_handle hSatisfiedEcaList = NULL; 
@@ -589,7 +589,7 @@ static cap_result handleUserApplication(IN SAppManager *pstAppManager, IN cap_st
     ERRIFGOTO(result, _EXIT);
 
     //Get Condition List
-    result = DBHandler_MakeConditionList(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList);
+    result = DBHandler_MakeConditionListWithDevice(pstAppManager->pDBconn, strDeviceId, strVariableName, hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
 
     //Compute Each condition -> if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
@@ -672,7 +672,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
 
-        result = handleUserApplication(pstAppManager, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
+        result = handleUserApplicationWithDevice(pstAppManager, strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable));
         ERRIFGOTO(result, _EXIT);
 
     }
@@ -774,8 +774,6 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
 
-        // TODO
-        // 이 아래 함수 수정해야 할지도...?
         result = handleUserApplicationWithService(pstAppManager, strProductName, strVariableName, nUserId, (char *)json_object_get_string(pJsonVariable));
         ERRIFGOTO(result, _EXIT);
 

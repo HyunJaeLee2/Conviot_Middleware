@@ -1007,7 +1007,7 @@ _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
     return result;
 }
-cap_result DBHandler_MakeConditionList(IN MYSQL *pDBconn, IN cap_string strDeviceId,\
+cap_result DBHandler_MakeConditionListWithDevice(IN MYSQL *pDBconn, IN cap_string strDeviceId,\
         IN cap_string strVariableName, IN OUT cap_handle hRelatedConditionList)
 {
     cap_result result = ERR_CAP_UNKNOWN;
