@@ -494,7 +494,7 @@ cap_result MQTTMessageHandler_Publish(cap_handle hHandler, cap_string strTopic, 
     CAPLogger_Write(g_hLogger, MSG_DEBUG, "Waiting for message publication!");
     CAPLogger_Write(g_hLogger, MSG_DEBUG, "topic : %s\npayload : %s token : %d", CAPString_LowPtr(strTopic, NULL), pszPayload, nToken);
     
-    dlp("MQTT Pulish !! topic : %s\npayload : %s\n", CAPString_LowPtr(strTopic, NULL), pszPayload);
+    //dlp("MQTT Pulish !! topic : %s\npayload : %s\n", CAPString_LowPtr(strTopic, NULL), pszPayload);
 
     while(pstHandler->nDeliveredToken != nToken) {
         if(pstHandler->nPublishWaitTime > 0) {

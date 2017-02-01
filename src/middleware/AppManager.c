@@ -281,7 +281,8 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
         dlp("not supported type for condition!\n");
     }
 
-    dlp("is satisfied : %d\n", bIsSatisfied);
+    dlp("expression : %s eca_id : %d, is satisfied : %d\n", CAPString_LowPtr(pstConditionContext->strExpression, NULL),\
+           pstConditionContext->nEcaId,  bIsSatisfied);
     pstConditionContext->bIsSatisfied = bIsSatisfied;
 
     result = ERR_CAP_NOERROR;
@@ -394,6 +395,9 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
         pszPayload = strdup(json_object_to_json_string(pJsonObject));
         nPayloadLen = strlen(pszPayload);
 
+        dlp("Function activated!! recevier_id : %s, function name : %s, payload : %s\n", CAPString_LowPtr(pstActionContext->strReceiverId, NULL),\
+                CAPString_LowPtr(pstActionContext->strFunctionName, NULL), pszPayload); 
+
         result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
         ERRIFGOTO(result, _EXIT);
         
@@ -435,6 +439,7 @@ static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedCond
         //if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
         if(pstConditionContext->bIsSatisfied) {
             if(pstConditionContext->bIsSingleCondition || pstConditionContext->enEcaOp == OPERATOR_OR) {
+                dlp("ECA :%d will be executed for single/any condition is met!\n", pstConditionContext->nEcaId);
                 result = requestAction(pstConditionContext->nEcaId, hAppManager);
                 ERRIFGOTO(result, _EXIT);
             }
@@ -466,6 +471,8 @@ static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, cap_hand
         ERRIFGOTO(result, _EXIT);
 
         nEcaId = *pnEcaId;
+
+        dlp("ECA :%d will be executed for all of the conditions are met!\n", nEcaId);
 
         result = requestAction(nEcaId, hAppManager);
         ERRIFGOTO(result, _EXIT);
