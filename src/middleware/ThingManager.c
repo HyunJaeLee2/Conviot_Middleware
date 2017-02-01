@@ -129,7 +129,7 @@ _EXIT:
  -Get file path from config file
  -write binary then save it into db
 */
-static cap_result saveBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, IN char *pszFormat, OUT cap_string strBinaryDBPath)
+static cap_result saveDeviceBinaryFileThenGetPath(IN cap_string strDeviceId, IN cap_string strVariableName, IN char * pszVariable, IN char *pszFormat, OUT cap_string strBinaryDBPath)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     FILE* pFile = NULL;
@@ -171,6 +171,47 @@ _EXIT:
     return result;
 }
 
+static cap_result saveServiceBinaryFileThenGetPath(IN cap_string strProductName, IN int nUserId, IN cap_string strVariableName, IN char * pszVariable, IN char *pszFormat, OUT cap_string strBinaryDBPath)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    FILE* pFile = NULL;
+    //TODO : set path prefix in config file
+    const char *pszConstFilePathPrefix = "/var/www/Conviot/static/repository";
+    const char *pszConstDBPathPrefix = "http://www.conviot.com/static/repository";
+    cap_string strFilePath = NULL;
+    char *pszDecodedData = NULL;
+    int nDecodedLen = 0;
+
+    strFilePath = CAPString_New();
+    ERRMEMGOTO(strFilePath, result, _EXIT);
+    
+    result = CAPString_PrintFormat(strFilePath, "%s/%s_%d_%s_%lu.%s", pszConstFilePathPrefix, CAPString_LowPtr(strProductName, NULL), nUserId,\
+            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
+    ERRIFGOTO(result, _EXIT);
+    
+    result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%d_%s_%lu.%s", pszConstDBPathPrefix,  CAPString_LowPtr(strProductName, NULL), nUserId,\
+            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
+    ERRIFGOTO(result, _EXIT);
+
+    result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
+    ERRIFGOTO(result, _EXIT);
+   
+    dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
+    pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
+    if(pFile == NULL) {
+        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+    }      
+
+    fwrite(pszDecodedData, nDecodedLen, 1, pFile);
+
+    fclose(pFile);
+
+    SAFE_CAPSTRING_DELETE(strFilePath);
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    return result;
+}
 static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hThingManager, cap_string strMessageReceiverId, cap_string strTopicCategory)
 {
     cap_result result = ERR_CAP_UNKNOWN;
@@ -357,7 +398,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
             strBinaryDBPath = CAPString_New();
             ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
 
-            result = saveBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), \
+            result = saveDeviceBinaryFileThenGetPath(strDeviceId, strVariableName, (char *)json_object_get_string(pJsonVariable), \
                     (char *)json_object_get_string(pJsonFormat), strBinaryDBPath);
             ERRIFGOTO(result, _EXIT);
             
@@ -442,9 +483,7 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
             strBinaryDBPath = CAPString_New();
             ERRMEMGOTO(strBinaryDBPath, result, _EXIT);
             
-            //TODO
-            //add user thing to binary file name when it is a servicee
-            result = saveBinaryFileThenGetPath(strProductName, strVariableName, (char *)json_object_get_string(pJsonVariable), \
+            result = saveServiceBinaryFileThenGetPath(strProductName, nUserId, strVariableName, (char *)json_object_get_string(pJsonVariable), \
                     (char *)json_object_get_string(pJsonFormat), strBinaryDBPath);
             ERRIFGOTO(result, _EXIT);
             
