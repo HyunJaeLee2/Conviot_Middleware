@@ -618,7 +618,11 @@ _EXIT:
     return result;
 }
 
-cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_string strProductName, IN int nUserId, IN cap_string strVariableName, IN char * pszVariable)
+//TODO
+//Current logic has too much overhead that it inserts general service variable to each service.
+//However, since all variables are the same, it could be handled with one service.
+static cap_result insertGeneralServiceVariableHistory(IN MYSQL *pDBconn, IN cap_string strProductName,\
+        IN int nUserId, IN cap_string strVariableName, IN char * pszVariable)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     char query[QUERY_SIZE];
@@ -627,9 +631,73 @@ cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_stri
     int nRowCount = 0;
     int nUserThingId = 0, nCustomerId = 0, nVariableId = 0;
     
-    result = checkServiceWithName(pDBconn, strProductName);
+    snprintf(query, QUERY_SIZE, "\
+            SELECT\
+                userthing.id,\
+                userthing.customer_id,\
+                variable.id\
+            FROM\
+                things_product product,\
+                things_userthing userthing,\
+                things_variable variable\
+            WHERE\
+                product.identifier = '%s' and\
+                userthing.product_id = product.id and\
+                variable.identifier = '%s' and\
+                variable.product_id = product.id;", CAPString_LowPtr(strProductName, NULL), CAPString_LowPtr(strVariableName, NULL));
+    
+    result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
+    while( (mysqlRow = mysql_fetch_row(pMysqlResult)) ) 
+    {
+        //if there is no matching service
+        if(mysqlRow == NULL){
+            dlp("There is no matching service!\n");
+            ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
+        }
+        else {
+            nUserThingId = atoiIgnoreNull(mysqlRow[0]);
+            nCustomerId = atoiIgnoreNull(mysqlRow[1]);
+            nVariableId = atoiIgnoreNull(mysqlRow[2]);
+        }
+   
+        //If custumor hasn't connected their service, service's customer id is set as null
+        if(nCustomerId == NULL_ERROR) {
+            snprintf(query, QUERY_SIZE, "\
+                    INSERT INTO\
+                    things_variablehistory(created_at, updated_at, user_thing_id, variable_id, value)\
+                    VALUES(now(), now(), %d, %d, '%s');", nUserThingId, nVariableId, pszVariable);
+            
+        }
+        else {
+            snprintf(query, QUERY_SIZE, "\
+                    INSERT INTO\
+                    things_variablehistory(created_at, updated_at, customer_id, user_thing_id, variable_id, value)\
+                    VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
+        }
+
+        result = callQuery(pDBconn, query);
+        ERRIFGOTO(result, _EXIT);
+    
+    }
+    
+    result = ERR_CAP_NOERROR;
+_EXIT:
+    SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+static cap_result insertSpecificServiceVariableHistory(IN MYSQL *pDBconn, IN cap_string strProductName,\
+        IN int nUserId, IN cap_string strVariableName, IN char * pszVariable)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    char query[QUERY_SIZE];
+    MYSQL_RES *pMysqlResult = NULL;
+    MYSQL_ROW mysqlRow;
+    int nRowCount = 0;
+    int nUserThingId = 0, nCustomerId = 0, nVariableId = 0;
+    
     snprintf(query, QUERY_SIZE, "\
             SELECT\
                 userthing.id,\
@@ -680,13 +748,36 @@ cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_stri
                 VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
     }
 
-    dlp("query : %s\n", query);
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
-
+    
     result = ERR_CAP_NOERROR;
 _EXIT:
     SAFEMYSQLFREE(pMysqlResult);
+    return result;
+}
+
+cap_result DBHandler_InsertServiceVariableHistory(IN MYSQL *pDBconn, IN cap_string strProductName,\
+        IN int nUserId, IN cap_string strVariableName, IN char * pszVariable)
+{
+    cap_result result = ERR_CAP_UNKNOWN;
+    
+    result = checkServiceWithName(pDBconn, strProductName);
+    ERRIFGOTO(result, _EXIT);
+    
+    //If nUserId == -1, it means a service is a general service such as date and time
+    if(nUserId == -1)
+    {
+        result = insertGeneralServiceVariableHistory(pDBconn, strProductName, nUserId, strVariableName, pszVariable);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else {
+        result = insertSpecificServiceVariableHistory(pDBconn, strProductName, nUserId, strVariableName, pszVariable);
+        ERRIFGOTO(result, _EXIT);
+    }
+
+    result = ERR_CAP_NOERROR;
+_EXIT:
     return result;
 }
 
