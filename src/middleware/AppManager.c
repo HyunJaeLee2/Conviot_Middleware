@@ -325,6 +325,9 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
     for(nLoop = 0; nLoop < nLength; nLoop++){
         result = CAPLinkedList_Get(hActionList, LINKED_LIST_OFFSET_FIRST, nLoop, (void**)&pstActionContext);
         ERRIFGOTO(result, _EXIT);
+        
+        pJsonObject = json_object_new_object();
+        ERRMEMGOTO(pJsonObject, result, _EXIT);
 
         if(pstActionContext->bIsServiceType)  
         {   
@@ -368,9 +371,6 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
         result = CAPString_AppendString(strTopic, pstActionContext->strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
-        pJsonObject = json_object_new_object();
-        ERRMEMGOTO(pJsonObject, result, _EXIT);
-
         //add eca id
         json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
 
@@ -389,7 +389,7 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
                     CAPString_Length(pstActionContext->strArgumentPayload));
             ERRIFGOTO(result, _EXIT);
 
-            json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray); 
+            json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray);
         }
         pszPayload = strdup(json_object_to_json_string(pJsonObject));
         nPayloadLen = strlen(pszPayload);
