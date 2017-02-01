@@ -236,7 +236,6 @@ _EXIT:
     SAFEJSONFREE(pJsonObject);
     SAFEMEMFREE(pszPayload);
     SAFEMEMFREE(pszApiKey);
-    SAFE_CAPSTRING_DELETE(strTopic);
 
     return result;
 }

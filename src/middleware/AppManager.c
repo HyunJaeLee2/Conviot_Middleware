@@ -674,8 +674,6 @@ _EXIT:
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }
 
-    SAFE_CAPSTRING_DELETE(strCategory);
-    SAFE_CAPSTRING_DELETE(strDeviceId);
     return result;
 }
 
@@ -775,9 +773,7 @@ _EXIT:
     if(result != ERR_CAP_NOERROR){
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }
-
-    SAFE_CAPSTRING_DELETE(strCategory);
-    SAFE_CAPSTRING_DELETE(strProductName);
+    
     return result;
 }
 
@@ -821,7 +817,6 @@ _EXIT:
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }
     
-    SAFE_CAPSTRING_DELETE(strReceiver);
     return result;
 }
 
