@@ -168,117 +168,124 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
     cap_bool bIsSatisfied = FALSE;
     char *pszExpression = NULL;
     char *pszToken, *pszPtr = NULL;
+    const char *pszConstEvent = "event";
     int nTokenCount = 0;
 
     IFVARERRASSIGNGOTO(pstConditionContext, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     pszExpression = CAPString_LowPtr(pstConditionContext->strExpression, NULL);
 
-    if(pstConditionContext->enType == TYPE_INTEGER || pstConditionContext->enType == TYPE_DOUBLE) {
-        //case 1 : [operand1][space][operator1][space]"value"
-        //case 2 : [operand1][space][operator1][space]"value"[space][operator2][space][operand2]
-        double dbOperand1, dbOperand2;
-        EOperator enOperator1, enOperator2;
-
-        double dbVariable = atof(pszVariable);
-
-        //First Token -> operand1
-        if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
-            dbOperand1 = atof(pszToken);
-            nTokenCount++;
-        }
-
-        //Second Token -> operator1
-        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
-            enOperator1 = convertStringOperatorToEnum(pszToken, 1);
-            nTokenCount++;
-        }
-
-        //Third Token -> dummy
-        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
-            nTokenCount++;
-        }
-
-        //Fourth Token -> operator2
-        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
-            enOperator2 = convertStringOperatorToEnum(pszToken, 2);
-            nTokenCount++;
-        }
-
-        //Fifth Token -> operand2
-        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
-            dbOperand2 = atof(pszToken);
-            nTokenCount++;
-        }
-
-        //case 1
-        if(nTokenCount == 3) {
-            result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied);
-            ERRIFGOTO(result, _EXIT);
-        }
-        //case 2
-        else if(nTokenCount == 5){
-            cap_bool bIsSatisfied1 = FALSE;
-            cap_bool bIsSatisfied2 = FALSE;
-
-            result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied1);
-            ERRIFGOTO(result, _EXIT);
-
-            result = checkDoubleCondition(dbVariable, enOperator2, dbOperand2, &bIsSatisfied2);
-            ERRIFGOTO(result, _EXIT);
-
-            bIsSatisfied = (bIsSatisfied1 && bIsSatisfied2);
-        }
-        else {
-            dlp("nTokenCount error!\n");
-        }
-    }
-    else if(pstConditionContext->enType == TYPE_STRING || pstConditionContext->enType == TYPE_SELECT) {
-        //case 1 : "value"[space][operator][space][operand]
-        char *pszOperand = NULL;
-        EOperator enOperator;
-
-        //First Token -> dummy
-        if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
-            nTokenCount++;
-        }
-
-        //Second Token -> operator
-        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
-            enOperator = convertStringOperatorToEnum(pszToken, 1);
-            nTokenCount++;
-        }
-
-        //Third Token -> operand
-        if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
-            pszOperand = strdup(pszToken);
-            nTokenCount++;
-        }
-
-        if(enOperator == OPERATOR_STRING_IS_EQUAL){
-            //strcmp returns 0 when two strings are equal
-            if(strcmp(pszOperand, pszVariable) == 0) {
-                bIsSatisfied = TRUE;
-            }
-            else {
-                bIsSatisfied = FALSE;
-            }
-
-        }
-        else if(enOperator == OPERATOR_STRING_CONTAINS) {
-            char *pszResult = strstr(pszVariable, pszOperand);
-            if(pszResult != NULL) {
-                bIsSatisfied = TRUE;
-            }
-            else {
-                bIsSatisfied = FALSE;
-            }
-        }
-        SAFEMEMFREE(pszOperand);
+    if(strncmp(pszConstEvent, pszExpression, 5) == 0) {
+        //If it is event type, there is no need to compute
+        bIsSatisfied = TRUE;
     }
     else {
-        //binary type is not available for condition
-        dlp("not supported type for condition!\n");
+        if(pstConditionContext->enType == TYPE_INTEGER || pstConditionContext->enType == TYPE_DOUBLE) {
+            //case 1 : [operand1][space][operator1][space]"value"
+            //case 2 : [operand1][space][operator1][space]"value"[space][operator2][space][operand2]
+            double dbOperand1, dbOperand2;
+            EOperator enOperator1, enOperator2;
+
+            double dbVariable = atof(pszVariable);
+
+            //First Token -> operand1
+            if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
+                dbOperand1 = atof(pszToken);
+                nTokenCount++;
+            }
+
+            //Second Token -> operator1
+            if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+                enOperator1 = convertStringOperatorToEnum(pszToken, 1);
+                nTokenCount++;
+            }
+
+            //Third Token -> dummy
+            if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+                nTokenCount++;
+            }
+
+            //Fourth Token -> operator2
+            if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+                enOperator2 = convertStringOperatorToEnum(pszToken, 2);
+                nTokenCount++;
+            }
+
+            //Fifth Token -> operand2
+            if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+                dbOperand2 = atof(pszToken);
+                nTokenCount++;
+            }
+
+            //case 1
+            if(nTokenCount == 3) {
+                result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied);
+                ERRIFGOTO(result, _EXIT);
+            }
+            //case 2
+            else if(nTokenCount == 5){
+                cap_bool bIsSatisfied1 = FALSE;
+                cap_bool bIsSatisfied2 = FALSE;
+
+                result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied1);
+                ERRIFGOTO(result, _EXIT);
+
+                result = checkDoubleCondition(dbVariable, enOperator2, dbOperand2, &bIsSatisfied2);
+                ERRIFGOTO(result, _EXIT);
+
+                bIsSatisfied = (bIsSatisfied1 && bIsSatisfied2);
+            }
+            else {
+                dlp("nTokenCount error!\n");
+            }
+        }
+        else if(pstConditionContext->enType == TYPE_STRING || pstConditionContext->enType == TYPE_SELECT) {
+            //case 1 : "value"[space][operator][space][operand]
+            char *pszOperand = NULL;
+            EOperator enOperator;
+
+            //First Token -> dummy
+            if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
+                nTokenCount++;
+            }
+
+            //Second Token -> operator
+            if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+                enOperator = convertStringOperatorToEnum(pszToken, 1);
+                nTokenCount++;
+            }
+
+            //Third Token -> operand
+            if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
+                pszOperand = strdup(pszToken);
+                nTokenCount++;
+            }
+
+            if(enOperator == OPERATOR_STRING_IS_EQUAL){
+                //strcmp returns 0 when two strings are equal
+                if(strcmp(pszOperand, pszVariable) == 0) {
+                    bIsSatisfied = TRUE;
+                }
+                else {
+                    bIsSatisfied = FALSE;
+                }
+
+            }
+            else if(enOperator == OPERATOR_STRING_CONTAINS) {
+                char *pszResult = strstr(pszVariable, pszOperand);
+                if(pszResult != NULL) {
+                    bIsSatisfied = TRUE;
+                }
+                else {
+                    bIsSatisfied = FALSE;
+                }
+            }
+            SAFEMEMFREE(pszOperand);
+        }
+        else {
+            //binary type is not available for condition
+            dlp("not supported type for condition!\n");
+        }
     }
 
     dlp("expression : %s eca_id : %d, is satisfied : %d\n", CAPString_LowPtr(pstConditionContext->strExpression, NULL),\
