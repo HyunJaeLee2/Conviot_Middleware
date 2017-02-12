@@ -669,12 +669,9 @@ static cap_result insertGeneralServiceVariableHistory(IN MYSQL *pDBconn, IN cap_
         }
    
         //If custumor hasn't connected their service, service's customer id is set as null
+        //However, since backend connects general services automatically, it should not happen
         if(nCustomerId == NULL_ERROR) {
-            snprintf(query, QUERY_SIZE, "\
-                    INSERT INTO\
-                    things_variablehistory(created_at, updated_at, user_thing_id, variable_id, value)\
-                    VALUES(now(), now(), %d, %d, '%s');", nUserThingId, nVariableId, pszVariable);
-            
+            ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
         }
         else {
             snprintf(query, QUERY_SIZE, "\
@@ -887,11 +884,11 @@ cap_result DBHandler_InsertServiceApplicationHistory(IN MYSQL *pDBconn, IN cap_s
     memset(query, 0, QUERY_SIZE);
     snprintf(query, QUERY_SIZE, "\
             SELECT\
-                customer.id\
+                eca.customer_id\
             FROM\
-                things_customer customer\
+                things_eventconditionaction eca\
             WHERE\
-                customer.user_id = %d;", nUserId);
+                eca.id = %d;", nEcaId);
    
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
