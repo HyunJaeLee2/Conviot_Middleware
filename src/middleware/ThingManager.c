@@ -136,38 +136,48 @@ static cap_result saveDeviceBinaryFileThenGetPath(IN cap_string strDeviceId, IN 
     //TODO : set path prefix in config file
     const char *pszConstFilePathPrefix = "/var/www/Conviot/static/repository";
     const char *pszConstDBPathPrefix = "http://www.conviot.com/static/repository";
+    const char *pszHttpPrefix = "http";
     cap_string strFilePath = NULL;
     char *pszDecodedData = NULL;
     int nDecodedLen = 0;
 
-    strFilePath = CAPString_New();
-    ERRMEMGOTO(strFilePath, result, _EXIT);
-    
-    result = CAPString_PrintFormat(strFilePath, "%s/%s_%s_%lu.%s", pszConstFilePathPrefix, CAPString_LowPtr(strDeviceId, NULL), \
-            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
-    ERRIFGOTO(result, _EXIT);
-    
-    result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%s_%lu.%s", pszConstDBPathPrefix,  CAPString_LowPtr(strDeviceId, NULL), \
-            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
-    ERRIFGOTO(result, _EXIT);
 
-    result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
-    ERRIFGOTO(result, _EXIT);
-   
-    dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
-    pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
-    if(pFile == NULL) {
-        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
-    }      
+    if(strncmp(pszHttpPrefix, pszVariable, 4) == 0) {
+        //if variable starts with http, just save its url in database
+        result = CAPString_SetLow(strBinaryDBPath, pszVariable , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else 
+    {
+        strFilePath = CAPString_New();
+        ERRMEMGOTO(strFilePath, result, _EXIT);
 
-    fwrite(pszDecodedData, nDecodedLen, 1, pFile);
+        result = CAPString_PrintFormat(strFilePath, "%s/%s_%s_%lu.%s", pszConstFilePathPrefix, CAPString_LowPtr(strDeviceId, NULL), \
+                CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
+        ERRIFGOTO(result, _EXIT);
 
-    fclose(pFile);
+        result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%s_%lu.%s", pszConstDBPathPrefix,  CAPString_LowPtr(strDeviceId, NULL), \
+                CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
+        ERRIFGOTO(result, _EXIT);
 
-    SAFE_CAPSTRING_DELETE(strFilePath);
+        result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
+        ERRIFGOTO(result, _EXIT);
+
+        //dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
+        
+        pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
+        if(pFile == NULL) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }      
+
+        fwrite(pszDecodedData, nDecodedLen, 1, pFile);
+
+        fclose(pFile);
+    }
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFE_CAPSTRING_DELETE(strFilePath);
     return result;
 }
 
@@ -178,38 +188,45 @@ static cap_result saveServiceBinaryFileThenGetPath(IN cap_string strProductName,
     //TODO : set path prefix in config file
     const char *pszConstFilePathPrefix = "/var/www/Conviot/static/repository";
     const char *pszConstDBPathPrefix = "http://www.conviot.com/static/repository";
+    const char *pszHttpPrefix = "http";
     cap_string strFilePath = NULL;
     char *pszDecodedData = NULL;
     int nDecodedLen = 0;
 
-    strFilePath = CAPString_New();
-    ERRMEMGOTO(strFilePath, result, _EXIT);
-    
-    result = CAPString_PrintFormat(strFilePath, "%s/%s_%d_%s_%lu.%s", pszConstFilePathPrefix, CAPString_LowPtr(strProductName, NULL), nUserId,\
-            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
-    ERRIFGOTO(result, _EXIT);
-    
-    result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%d_%s_%lu.%s", pszConstDBPathPrefix,  CAPString_LowPtr(strProductName, NULL), nUserId,\
-            CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
-    ERRIFGOTO(result, _EXIT);
+    if(strncmp(pszHttpPrefix, pszVariable, 4) == 0) {
+        //if variable starts with http, just save its url in database
+        result = CAPString_SetLow(strBinaryDBPath, pszVariable , CAPSTRING_MAX);
+        ERRIFGOTO(result, _EXIT);
+    }
+    else {
+        strFilePath = CAPString_New();
+        ERRMEMGOTO(strFilePath, result, _EXIT);
 
-    result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
-    ERRIFGOTO(result, _EXIT);
-   
-    dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
-    pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
-    if(pFile == NULL) {
-        ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
-    }      
+        result = CAPString_PrintFormat(strFilePath, "%s/%s_%d_%s_%lu.%s", pszConstFilePathPrefix, CAPString_LowPtr(strProductName, NULL), nUserId,\
+                CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
+        ERRIFGOTO(result, _EXIT);
 
-    fwrite(pszDecodedData, nDecodedLen, 1, pFile);
+        result = CAPString_PrintFormat(strBinaryDBPath, "%s/%s_%d_%s_%lu.%s", pszConstDBPathPrefix,  CAPString_LowPtr(strProductName, NULL), nUserId,\
+                CAPString_LowPtr(strVariableName, NULL), (unsigned long)time(NULL), pszFormat);
+        ERRIFGOTO(result, _EXIT);
 
-    fclose(pFile);
+        result = CAPBase64_Decode(pszVariable, &pszDecodedData, &nDecodedLen);
+        ERRIFGOTO(result, _EXIT);
 
-    SAFE_CAPSTRING_DELETE(strFilePath);
+        dlp("path1 : %s, path2 : %s\n", CAPString_LowPtr(strFilePath, NULL), CAPString_LowPtr(strBinaryDBPath, NULL));
+        pFile = fopen(CAPString_LowPtr(strFilePath, NULL),"wb");
+        if(pFile == NULL) {
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }      
+
+        fwrite(pszDecodedData, nDecodedLen, 1, pFile);
+
+        fclose(pFile);
+    }
 
     result = ERR_CAP_NOERROR;
 _EXIT:
+    SAFE_CAPSTRING_DELETE(strFilePath);
     return result;
 }
 static cap_result ThingManager_PublishErrorCode(IN int errorCode, cap_handle hThingManager, cap_string strMessageReceiverId, cap_string strTopicCategory)
