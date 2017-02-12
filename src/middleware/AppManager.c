@@ -50,7 +50,7 @@ static CALLBACK cap_result destroyRelatedCondtion(int nOffset, void* pData, void
 
     pstConditionContext = (SConditionContext*)pData;
 
-	SAFE_CAPSTRING_DELETE(pstConditionContext->strExpression);
+    SAFE_CAPSTRING_DELETE(pstConditionContext->strExpression);
     SAFEMEMFREE(pstConditionContext);
 
     result = ERR_CAP_NOERROR;
@@ -79,9 +79,9 @@ static CALLBACK cap_result destroyAction(int nOffset, void* pData, void* pUsrDat
 
     pstActionContext = (SActionContext*)pData;
 
-	SAFE_CAPSTRING_DELETE(pstActionContext->strReceiverId);
-	SAFE_CAPSTRING_DELETE(pstActionContext->strFunctionName);
-	SAFE_CAPSTRING_DELETE(pstActionContext->strArgumentPayload);
+    SAFE_CAPSTRING_DELETE(pstActionContext->strReceiverId);
+    SAFE_CAPSTRING_DELETE(pstActionContext->strFunctionName);
+    SAFE_CAPSTRING_DELETE(pstActionContext->strArgumentPayload);
     SAFEMEMFREE(pstActionContext);
 
     result = ERR_CAP_NOERROR;
@@ -155,10 +155,10 @@ static cap_result checkDoubleCondition(double dbVariable, EOperator enOperator, 
         default:
             dlp("not supported operator for double condition!\n");
             bIsSatisfied = FALSE;
-    } 
+    }
 
     *pbIsSatisfied = bIsSatisfied;
-    
+
     result = ERR_CAP_NOERROR;
     return result;
 }
@@ -171,8 +171,8 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
     int nTokenCount = 0;
 
     IFVARERRASSIGNGOTO(pstConditionContext, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
-    
-    pszExpression = CAPString_LowPtr(pstConditionContext->strExpression, NULL); 
+
+    pszExpression = CAPString_LowPtr(pstConditionContext->strExpression, NULL);
 
     if(pstConditionContext->enType == TYPE_INTEGER || pstConditionContext->enType == TYPE_DOUBLE) {
         //case 1 : [operand1][space][operator1][space]"value"
@@ -220,15 +220,15 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
         else if(nTokenCount == 5){
             cap_bool bIsSatisfied1 = FALSE;
             cap_bool bIsSatisfied2 = FALSE;
-            
+
             result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied1);
             ERRIFGOTO(result, _EXIT);
-            
+
             result = checkDoubleCondition(dbVariable, enOperator2, dbOperand2, &bIsSatisfied2);
             ERRIFGOTO(result, _EXIT);
 
             bIsSatisfied = (bIsSatisfied1 && bIsSatisfied2);
-        } 
+        }
         else {
             dlp("nTokenCount error!\n");
         }
@@ -238,7 +238,7 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
         char *pszOperand = NULL;
         EOperator enOperator;
 
-        //First Token -> dummy 
+        //First Token -> dummy
         if( (pszToken = strtok_r(pszExpression, " ", &pszPtr)) ) {
             nTokenCount++;
         }
@@ -249,7 +249,7 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
             nTokenCount++;
         }
 
-        //Third Token -> operand 
+        //Third Token -> operand
         if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
             pszOperand = strdup(pszToken);
             nTokenCount++;
@@ -282,7 +282,7 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
     }
 
     dlp("expression : %s eca_id : %d, is satisfied : %d\n", CAPString_LowPtr(pstConditionContext->strExpression, NULL),\
-           pstConditionContext->nEcaId,  bIsSatisfied);
+            pstConditionContext->nEcaId,  bIsSatisfied);
     pstConditionContext->bIsSatisfied = bIsSatisfied;
 
     result = ERR_CAP_NOERROR;
@@ -301,20 +301,20 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
     char *pszPayload = NULL;
     int nPayloadLen;
     int nLength = 0, nLoop = 0;
-    cap_handle hActionList = NULL; 
+    cap_handle hActionList = NULL;
     SActionContext *pstActionContext;
     char *pszApiKey = NULL;
 
     IFVARERRASSIGNGOTO(hAppManager, NULL, result, ERR_CAP_INVALID_PARAM, _EXIT);
 
     pstAppManager = (SAppManager *)hAppManager;
-    
+
     result = CAPLinkedList_Create(&hActionList);
     ERRIFGOTO(result, _EXIT);
 
     result = DBHandler_RetrieveActionList(pstAppManager->pDBconn, nEcaId, hActionList);
     ERRIFGOTO(result, _EXIT);
-    
+
     //set topic
     //Format : [MT|MS]/REQUEST_FUNCTION/[Thing ID]/[Function name]
     strTopic = CAPString_New();
@@ -326,38 +326,38 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
     for(nLoop = 0; nLoop < nLength; nLoop++){
         result = CAPLinkedList_Get(hActionList, LINKED_LIST_OFFSET_FIRST, nLoop, (void**)&pstActionContext);
         ERRIFGOTO(result, _EXIT);
-        
+
         pJsonObject = json_object_new_object();
         ERRMEMGOTO(pJsonObject, result, _EXIT);
 
-        if(pstActionContext->bIsServiceType)  
-        {   
+        if(pstActionContext->bIsServiceType)
+        {
             result = CAPString_Set(strTopic, CAPSTR_SERVICE_REQUEST_FUNCTION);
             ERRIFGOTO(result, _EXIT);
-            
+
             //add api key
             result = DBHandler_RetrieveServiceApiKey(pstAppManager->pDBconn, pstActionContext->strReceiverId, &pszApiKey);
             ERRIFGOTO(result, _EXIT);
 
             if(pszApiKey == NULL) {
                 //do nothing
-            } 
+            }
             else {
                 json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
             }
         }
         else
-        {   
+        {
             result = CAPString_Set(strTopic, CAPSTR_DEVICE_REQUEST_FUNCTION);
             ERRIFGOTO(result, _EXIT);
-            
+
             //add api key
             result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, pstActionContext->strReceiverId, &pszApiKey);
             ERRIFGOTO(result, _EXIT);
 
             if(pszApiKey == NULL) {
                 //do nothing
-            } 
+            }
             else {
                 json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
             }
@@ -368,18 +368,25 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
 
         result = CAPString_AppendString(strTopic, CAPSTR_TOPIC_SEPERATOR);
         ERRIFGOTO(result, _EXIT);
-    
+
         result = CAPString_AppendString(strTopic, pstActionContext->strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
+        //Quick fix to make json with string
+        //TODO
+        //change later with better code
+        char pszEcaId[10] = {0, }, pszUserId[10] = {0, };
+        sprintf(pszEcaId, "%d", nEcaId);
+        sprintf(pszUserId, "%d", pstActionContext->nUserId);
+
         //add eca id
-        json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_int(nEcaId));
+        json_object_object_add(pJsonObject, pszConstEcaId, json_object_new_string(pszEcaId));
 
 
         // Add user_id argument if action type is service
         if(pstActionContext->bIsServiceType)
         {
-            json_object_object_add(pJsonObject, "user_id", json_object_new_int(pstActionContext->nUserId));
+            json_object_object_add(pJsonObject, "user_id", json_object_new_string(pszUserId));
         }
 
         //Add Argument json only if there exists one
@@ -395,12 +402,12 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
         pszPayload = strdup(json_object_to_json_string(pJsonObject));
         nPayloadLen = strlen(pszPayload);
 
-        dlp("Function activated!! recevier_id : %s, function name : %s, payload : %s\n", CAPString_LowPtr(pstActionContext->strReceiverId, NULL),\
-                CAPString_LowPtr(pstActionContext->strFunctionName, NULL), pszPayload); 
+        dlp("Function activated!! recevier_id : %s, function name : %s, topic : %s payload : %s\n", CAPString_LowPtr(pstActionContext->strReceiverId, NULL),\
+                CAPString_LowPtr(pstActionContext->strFunctionName, NULL), CAPString_LowPtr(strTopic,NULL), pszPayload);
 
         result = MQTTMessageHandler_Publish(pstAppManager->hMQTTHandler, strTopic, pszPayload, nPayloadLen);
         ERRIFGOTO(result, _EXIT);
-        
+
         SAFEMEMFREE(pszApiKey);
         SAFEMEMFREE(pszPayload);
     }
@@ -435,7 +442,7 @@ static cap_result computeConditionsThenActuateIfPossible(cap_handle hRelatedCond
 
         result = computeSingleCondition(pstConditionContext, pszVariable);
         ERRIFGOTO(result, _EXIT);
-        
+
         //if condition is satisfied and there is only one condition or operator 'any' condition -> publish action right away
         if(pstConditionContext->bIsSatisfied) {
             if(pstConditionContext->bIsSingleCondition || pstConditionContext->enEcaOp == OPERATOR_OR) {
@@ -452,7 +459,7 @@ _EXIT:
 
 }
 
-static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, cap_handle hAppManager) 
+static cap_result actuateSatisfiedEcaList(cap_handle hSatisfiedEcaList, cap_handle hAppManager)
 {
     cap_result result = ERR_CAP_UNKNOWN;
     int nLength = 0, nLoop = 0;
@@ -528,13 +535,13 @@ static cap_result AppManager_PublishErrorCode(IN int errorCode, cap_handle hAppM
     //set payload
     pJsonObject = json_object_new_object();
     json_object_object_add(pJsonObject, "error", json_object_new_int(enError));
-    
+
     result = DBHandler_RetrieveDeviceApiKey(pstAppManager->pDBconn, strDeviceId, &pszApiKey);
     ERRIFGOTO(result, _EXIT);
 
     if(pszApiKey == NULL) {
         //do nothing
-    } 
+    }
     else {
         json_object_object_add(pJsonObject, "apikey", json_object_new_string(pszApiKey));
     }
@@ -556,12 +563,12 @@ _EXIT:
 static cap_result handleUserApplicationWithService(IN SAppManager *pstAppManager, IN cap_string strProductName, IN cap_string strVariableName,\
         IN int nUserId, IN char *pszVariable) {
     cap_result result = ERR_CAP_UNKNOWN;
-    cap_handle hRelatedConditionList = NULL; 
-    cap_handle hSatisfiedEcaList = NULL; 
+    cap_handle hRelatedConditionList = NULL;
+    cap_handle hSatisfiedEcaList = NULL;
 
     result = CAPLinkedList_Create(&hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
-    
+
     result = CAPLinkedList_Create(&hSatisfiedEcaList);
     ERRIFGOTO(result, _EXIT);
 
@@ -587,7 +594,7 @@ static cap_result handleUserApplicationWithService(IN SAppManager *pstAppManager
 
 _EXIT:
     if(result != ERR_CAP_NOERROR){
-        //nothing 
+        //nothing
     }
 
     CAPLinkedList_Traverse(hRelatedConditionList, destroyRelatedCondtion, NULL);
@@ -599,12 +606,12 @@ _EXIT:
 }
 static cap_result handleUserApplicationWithDevice(IN SAppManager *pstAppManager, IN cap_string strDeviceId, IN cap_string strVariableName, IN char *pszVariable) {
     cap_result result = ERR_CAP_UNKNOWN;
-    cap_handle hRelatedConditionList = NULL; 
-    cap_handle hSatisfiedEcaList = NULL; 
+    cap_handle hRelatedConditionList = NULL;
+    cap_handle hSatisfiedEcaList = NULL;
 
     result = CAPLinkedList_Create(&hRelatedConditionList);
     ERRIFGOTO(result, _EXIT);
-    
+
     result = CAPLinkedList_Create(&hSatisfiedEcaList);
     ERRIFGOTO(result, _EXIT);
 
@@ -630,7 +637,7 @@ static cap_result handleUserApplicationWithDevice(IN SAppManager *pstAppManager,
 
 _EXIT:
     if(result != ERR_CAP_NOERROR){
-        //nothing 
+        //nothing
     }
 
     CAPLinkedList_Traverse(hRelatedConditionList, destroyRelatedCondtion, NULL);
@@ -680,7 +687,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
         cap_string strVariableName = NULL;
         const char* pszConstVariable = "variable";
 
-        //If api key error has occured, goto exit 
+        //If api key error has occured, goto exit
         if(result_save != ERR_CAP_NOERROR){
             goto _EXIT;
         }
@@ -688,7 +695,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
         if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
-        //Get variable name 
+        //Get variable name
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
 
@@ -702,7 +709,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
         int nErrorCode = 0, nEcaId = 0;
 
-        //If api key error has occured, goto exit 
+        //If api key error has occured, goto exit
         if(result_save != ERR_CAP_NOERROR){
             goto _EXIT;
         }
@@ -719,7 +726,7 @@ static cap_result handleDeviceMessage(cap_string strTopic, cap_handle hTopicItem
 
         nErrorCode = json_object_get_int(pJsonTemp);
 
-        //Get variable name 
+        //Get variable name
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
@@ -760,7 +767,7 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
     result = ParsingJson(&pJsonObject, pszPayload, nPayloadLen);
     ERRIFGOTO(result, _EXIT);
 
-    if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey)) 
+    if (!json_object_object_get_ex(pJsonObject, pszConstApiKey, &pJsonApiKey))
     {
         ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
     }
@@ -785,12 +792,12 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
         cap_string strVariableName = NULL;
         const char* pszConstVariable = "variable";
 
-        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable)) 
+        if (!json_object_object_get_ex(pJsonObject, pszConstVariable, &pJsonVariable))
         {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
 
-        //Get variable name 
+        //Get variable name
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strVariableName);
         ERRIFGOTO(result, _EXIT);
 
@@ -804,19 +811,19 @@ static cap_result handleServiceMessage(cap_string strTopic, cap_handle hTopicIte
         const char* pszConstEcaId = "eca_id", *pszConstError = "error";
         int nErrorCode = 0, nEcaId = 0;
 
-        if (!json_object_object_get_ex(pJsonObject, pszConstEcaId, &pJsonTemp)) 
+        if (!json_object_object_get_ex(pJsonObject, pszConstEcaId, &pJsonTemp))
         {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
         nEcaId = json_object_get_int(pJsonTemp);
 
-        if (!json_object_object_get_ex(pJsonObject, pszConstError, &pJsonTemp)) 
+        if (!json_object_object_get_ex(pJsonObject, pszConstError, &pJsonTemp))
         {
             ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
         }
         nErrorCode = json_object_get_int(pJsonTemp);
 
-        //Get variable name 
+        //Get variable name
         result = CAPLinkedList_Get(hTopicItemList, LINKED_LIST_OFFSET_FIRST, TOPIC_LEVEL_FOURTH, (void**)&strFunctionName);
         ERRIFGOTO(result, _EXIT);
 
@@ -832,7 +839,7 @@ _EXIT:
     if(result != ERR_CAP_NOERROR){
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }
-    
+
     return result;
 }
 
@@ -875,7 +882,7 @@ _EXIT:
     if(result != ERR_CAP_NOERROR){
         //Added if clause for a case where a thread is terminated without accepting any data at all
     }
-    
+
     return result;
 }
 

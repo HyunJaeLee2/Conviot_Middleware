@@ -807,7 +807,6 @@ cap_result DBHandler_InsertDeviceVariableHistory(IN MYSQL *pDBconn,IN cap_string
                 userthing.id = device.user_thing_id and\
                 variable.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
     
-   
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
     ERRIFGOTO(result, _EXIT);
 
@@ -839,7 +838,6 @@ cap_result DBHandler_InsertDeviceVariableHistory(IN MYSQL *pDBconn,IN cap_string
                 VALUES(now(), now(), %d, %d, %d, '%s');", nCustomerId, nUserThingId, nVariableId, pszVariable);
     }
 
-    dlp("query : %s\n", query);
     result = callQuery(pDBconn, query);
     ERRIFGOTO(result, _EXIT);
 
