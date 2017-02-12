@@ -83,8 +83,14 @@ cap_result DBHandler_OpenDB(IN SDBInfo *pstDBInfo, OUT MYSQL **ppDBconn)
         ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
     }   
    
+    if(mysql_set_character_set(pDBconn, "utf8") != 0)
+    {
+        dlp("mysql charset error - current charset : %s\n", mysql_character_set_name(pDBconn));
+        ERRASSIGNGOTO(result, ERR_CAP_DB_ERROR, _EXIT);
+    }
+    
     *ppDBconn = pDBconn;
-
+   
     result = ERR_CAP_NOERROR;
 
 _EXIT:
