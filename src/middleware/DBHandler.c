@@ -808,6 +808,7 @@ cap_result DBHandler_InsertDeviceVariableHistory(IN MYSQL *pDBconn,IN cap_string
             WHERE\
                 device.device_id = '%s' and\
                 userthing.id = device.user_thing_id and\
+                userthing.product_id = variable.product_id and\
                 variable.identifier = '%s';", CAPString_LowPtr(strDeviceId, NULL), CAPString_LowPtr(strVariableName, NULL));
     
     result = callQueryWithResult(pDBconn, query, &pMysqlResult, &nRowCount);
@@ -828,11 +829,8 @@ cap_result DBHandler_InsertDeviceVariableHistory(IN MYSQL *pDBconn,IN cap_string
    
     //If custumor hasn't connected their device with pin code, device's customer id is set as null
     if(nCustomerId == NULL_ERROR) {
-        snprintf(query, QUERY_SIZE, "\
-                INSERT INTO\
-                things_variablehistory(created_at, updated_at, user_thing_id, variable_id, value)\
-                VALUES(now(), now(), %d, %d, '%s');", nUserThingId, nVariableId, pszVariable);
-        
+       dlp("customer hasn't connected\n");
+       ERRASSIGNGOTO(result, ERR_CAP_NO_DATA, _EXIT);
     }
     else {
         snprintf(query, QUERY_SIZE, "\
