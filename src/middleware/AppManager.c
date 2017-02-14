@@ -406,7 +406,7 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
 
             json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray);
         }
-        pszPayload = strdup(json_object_to_json_string(pJsonObject));
+        pszPayload = strdup(json_object_to_json_string_ext(pJsonObject, JSON_C_TO_STRING_NOSLASHESCAPE ));
         nPayloadLen = strlen(pszPayload);
 
         dlp("Function activated!! recevier_id : %s, function name : %s, topic : %s payload : %s\n", CAPString_LowPtr(pstActionContext->strReceiverId, NULL),\
