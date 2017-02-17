@@ -186,9 +186,11 @@ typedef enum _ECapResult {
 #ifdef _DEBUG
 
 #include <unistd.h>
+#include <sys/time.h>
+#include <time.h>
 
 #define dp(fmt,args...) fprintf(stderr, fmt, ## args )
-#define dlp(fmt,args...) fprintf(stderr, "[%s %s %d]" fmt, __FILE__, __FUNCTION__,__LINE__, ## args )
+#define dlp(fmt,args...) { struct timeval _tv; gettimeofday(&_tv, NULL); ; struct tm _tm = *localtime(&_tv.tv_sec);  fprintf(stderr, "[%02d:%02d:%02d.%03ld] [%s %s %d]" fmt, _tm.tm_hour, _tm.tm_min, _tm.tm_sec, _tv.tv_usec % 1000,  __FILE__, __FUNCTION__,__LINE__, ## args );}
 #define print_id(comment) fprintf(stderr, "sid: %5d, pgid: %5d, pid: %5d, ppid: %5d	 # %s\n", (int)getsid(0), (int)getpgid(0), (int)getpid(), (int)getppid(), comment)
 
 #define ERRIFGOTO(res, label) if((res)!=ERR_CAP_NOERROR) {fprintf(stderr, "error! %d (%s:%d, strerror: %s, pid: %d)\n", res, __FILE__,__LINE__, strerror(errno), getpid());goto label;}
