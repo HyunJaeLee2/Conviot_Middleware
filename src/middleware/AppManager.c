@@ -407,6 +407,12 @@ static cap_result requestAction(int nEcaId, cap_handle hAppManager)
             json_object_object_add(pJsonObject, pszConstArguments, pJsonArgumentArray);
         }
         pszPayload = strdup(json_object_to_json_string_ext(pJsonObject, JSON_C_TO_STRING_NOSLASHESCAPE ));
+        if(!pszPayload)
+        {
+            dlp("pJsonObject : %s\n", json_object_get_string(pJsonObject));
+            dlp("pJsonArgumentArray : %s\n", json_object_get_string(pJsonArgumentArray));
+            ERRASSIGNGOTO(result, ERR_CAP_INVALID_DATA, _EXIT);
+        }
         nPayloadLen = strlen(pszPayload);
 
         dlp("Function activated!! recevier_id : %s, function name : %s, topic : %s payload : %s\n", CAPString_LowPtr(pstActionContext->strReceiverId, NULL),\
