@@ -1476,21 +1476,20 @@ cap_result DBHandler_InsertSatisfiedCondition(IN MYSQL *pDBconn, IN cap_handle h
 
         //if condition is satisfied and there is only one condition or operator 'any' condition -> do nothing 
         //else -> set is_satisfied to TRUE
-        if(pstConditionContext->bIsSatisfied) {
-            if(pstConditionContext->bIsSingleCondition || pstConditionContext->enEcaOp == OPERATOR_OR) {
-                //do nothing
-            }
-            else {
-                snprintf(query, QUERY_SIZE, "\
-                        UPDATE\
-                            things_condition cond\
-                        SET\
-                            cond.is_satisfied = 1\
-                        where\
-                            cond.id = %d;", pstConditionContext->nConditionId);
-                result = callQuery(pDBconn, query);
-                ERRIFGOTO(result, _EXIT);
-            }
+        if(pstConditionContext->bIsSingleCondition || pstConditionContext->enEcaOp == OPERATOR_OR) {
+            //do nothing
+            continue;
+        }
+        else {
+            snprintf(query, QUERY_SIZE, "\
+                    UPDATE\
+                        things_condition cond\
+                    SET\
+                        cond.is_satisfied = %d\
+                    where\
+                        cond.id = %d;",pstConditionContext->bIsSatisfied, pstConditionContext->nConditionId);
+            result = callQuery(pDBconn, query);
+            ERRIFGOTO(result, _EXIT);
         }
     }
     result = ERR_CAP_NOERROR;
