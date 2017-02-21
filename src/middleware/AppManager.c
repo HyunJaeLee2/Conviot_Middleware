@@ -216,7 +216,7 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
                 dbOperand2 = atof(pszToken);
                 nTokenCount++;
             }
-
+            
             //case 1
             if(nTokenCount == 3) {
                 result = checkDoubleCondition(dbVariable, enOperator1, dbOperand1, &bIsSatisfied);
@@ -255,12 +255,17 @@ static cap_result computeSingleCondition(SConditionContext* pstConditionContext,
                 nTokenCount++;
             }
 
+            pszOperand = strdup(pszPtr);
+            dlp("Operand : %s\n", pszOperand);
+            nTokenCount++;
+
+            /*
             //Third Token -> operand
             if( (pszToken = strtok_r(NULL, " ", &pszPtr)) ) {
                 pszOperand = strdup(pszToken);
                 nTokenCount++;
             }
-
+            */
             if(enOperator == OPERATOR_STRING_IS_EQUAL){
                 //strcmp returns 0 when two strings are equal
                 if(strcmp(pszOperand, pszVariable) == 0) {

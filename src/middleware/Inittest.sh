@@ -1,1 +1,1 @@
-./conviot_middleware -f middleware_config.cfg
+sudo ./conviot_middleware -f middleware_config.cfg
