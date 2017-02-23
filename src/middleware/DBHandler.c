@@ -123,6 +123,8 @@ static cap_result replaceWithRealVariable(IN MYSQL *pDBconn, IN char *pszArgumen
      
     nArgLen = strlen(pszArgumentPayload);
 
+    sleep(0.3);
+
     //case : {{user_thing_id#variable_name}} 
     for(nArgIndex = 0; nArgIndex < nArgLen; nArgIndex++) {
         //If nArgIndex is pointing at the end of string, put it to final argument
